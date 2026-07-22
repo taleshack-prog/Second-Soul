@@ -1,0 +1,22 @@
+[project]
+name = "second-soul-twin"
+version = "0.1.0"
+description = "Gêmeo digital (RAG) — Second Soul"
+requires-python = ">=3.11"
+dependencies = ["scikit-learn>=1.4", "numpy>=1.26"]
+
+[project.optional-dependencies]
+sbert = ["sentence-transformers>=3.0"]
+groq = ["groq>=0.11"]
+ollama = ["httpx>=0.27"]
+dev = ["pytest>=8.2"]
+
+[project.scripts]
+ss-twin = "second_soul_twin.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["second_soul_twin*"]

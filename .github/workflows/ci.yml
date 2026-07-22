@@ -1,0 +1,27 @@
+name: CI
+on:
+  push: { branches: [main, develop] }
+  pull_request: { branches: [main] }
+
+jobs:
+  importer-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e packages/importer pytest
+      - run: cd packages/importer && pytest -q
+
+  api-boot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install fastapi pydantic-settings httpx
+      - name: smoke test (app importa e /health responde)
+        run: |
+          cd apps/api
+          python -c "from fastapi.testclient import TestClient; from app.main import app; \
+          assert TestClient(app).get('/health').status_code == 200; print('API OK')"

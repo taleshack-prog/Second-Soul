@@ -1,0 +1,29 @@
+node_modules/
+dist/
+.next/
+.turbo/
+.env
+.env.local
+*.pyc
+__pycache__/
+.pytest_cache/
+*.egg-info/
+build/
+.venv/
+venv/
+.terraform/
+terraform.tfstate*
+*.pem
+*.log
+.DS_Store
+coverage/
+# dados sensíveis de import (NUNCA commitar memórias reais)
+*.jsonl
+exports/
+uploads/
+
+# dados pessoais — NUNCA commitar
+perfil*.json
+.twin_index/
+EXPORT-*.zip
+apps/api/.env

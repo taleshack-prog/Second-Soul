@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: theme(colors.base);
+  color: theme(colors.ink);
+  /* luz âmbar difusa no topo — a essência pairando */
+  background-image: radial-gradient(
+    60% 45% at 50% -5%,
+    theme(colors.soulglow),
+    transparent 70%
+  );
+  background-repeat: no-repeat;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* respeita quem prefere menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* foco visível de teclado — piso de acessibilidade */
+:focus-visible {
+  outline: 2px solid theme(colors.soul);
+  outline-offset: 2px;
+}

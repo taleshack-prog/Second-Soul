@@ -1,0 +1,16 @@
+{
+  "name": "secondsoul",
+  "private": true,
+  "workspaces": ["apps/web", "apps/mobile", "packages/shared"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0",
+    "prettier": "^3.3.0"
+  },
+  "engines": { "node": ">=20.0.0" }
+}

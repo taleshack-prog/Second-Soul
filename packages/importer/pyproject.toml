@@ -1,0 +1,19 @@
+[project]
+name = "second-soul-importer"
+version = "0.1.0"
+description = "Universal Ingestion Engine do Second Soul"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2"]
+
+[project.scripts]
+ss-import = "second_soul_importer.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["second_soul_importer*"]
