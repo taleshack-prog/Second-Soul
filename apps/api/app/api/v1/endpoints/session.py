@@ -7,11 +7,22 @@ no lugar certo em vez de começar do zero.
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, HTTPException
 
 from app.core import sessions
 
 router = APIRouter(prefix="/session", tags=["Sessão"])
+
+
+@router.post("/new")
+async def new_session():
+    """Cria uma essência vazia — a jornada começa por QUEM a pessoa é,
+    não por um arquivo. Importar conversas passa a ser uma opção do acervo."""
+    job_id = uuid.uuid4().hex[:12]
+    sessions.session_dir(job_id, create=True)
+    return {"job_id": job_id}
 
 
 @router.get("/{job_id}")

@@ -53,10 +53,9 @@ async def save_profile(job_id: str, body: ProfileIn, background: BackgroundTasks
         json.dumps({"name": body.name, "fields": body.fields}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    # reindexa o gêmeo com a verdade declarada (se a essência já existe)
-    if (d / "essencia.jsonl").exists():
-        from app.api.v1.endpoints.voices import _build_index
-        background.add_task(_build_index, job_id)
+    # reindexa sempre: o gêmeo pode nascer só do que a pessoa declarou
+    from app.api.v1.endpoints.voices import _build_index
+    background.add_task(_build_index, job_id)
     return {"saved": True, "filled_fields": filled}
 
 

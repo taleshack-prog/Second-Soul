@@ -145,11 +145,15 @@ def _build_index(job_id: str) -> None:
         from second_soul_twin import TwinIndex, profile as prof
 
         rows = []
-        with open(d / "essencia.jsonl", encoding="utf-8") as fh:
-            for line in fh:
-                obj = json.loads(line)
-                if len((obj.get("content") or "").split()) >= 3:
-                    rows.append(obj)
+        ess = d / "essencia.jsonl"
+        if ess.exists():
+            with open(ess, encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    obj = json.loads(line)
+                    if len((obj.get("content") or "").split()) >= 3:
+                        rows.append(obj)
 
         summary = {}
         pfile = d / "perfil.json"
@@ -167,6 +171,9 @@ def _build_index(job_id: str) -> None:
         except ModuleNotFoundError:
             backend = "tfidf"
 
+        if not rows:
+            marker.write_text(json.dumps({"status": "empty"}), encoding="utf-8")
+            return
         idx = TwinIndex(backend=backend).build(rows, profile=summary)
         idx.save(d / "twin_index")
         marker.write_text(json.dumps({"status": "ready", "backend": backend}),

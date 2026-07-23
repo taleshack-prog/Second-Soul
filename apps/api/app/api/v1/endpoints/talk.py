@@ -39,11 +39,18 @@ async def ready(job_id: str):
     if not marker.exists():
         return {"status": "missing"}
     st = json.loads(marker.read_text(encoding="utf-8"))
-    person = {}
+    person, memories = "", 0
     pf = d / "pessoa.json"
     if pf.exists():
-        person = json.loads(pf.read_text(encoding="utf-8"))
-    return {**st, "person": person.get("name", ""), "memories": person.get("kept", 0)}
+        blob = json.loads(pf.read_text(encoding="utf-8"))
+        person, memories = blob.get("name", ""), blob.get("kept", 0)
+    prof = d / "perfil.json"
+    if not person and prof.exists():
+        person = json.loads(prof.read_text(encoding="utf-8")).get("name", "")
+    if not memories:
+        ess = d / "essencia.jsonl"
+        memories = sum(1 for _ in open(ess, encoding="utf-8")) if ess.exists() else 0
+    return {**st, "person": person, "memories": memories}
 
 
 class TalkIn(BaseModel):
@@ -68,8 +75,18 @@ async def talk(body: TalkIn):
     else:
         idx = cached[1]
 
-    person = json.loads((d / "pessoa.json").read_text(encoding="utf-8"))
-    name = person.get("name") or "a pessoa"
+    # o nome pode vir da separação de vozes (import) OU do perfil (fluxo novo)
+    name = "a pessoa"
+    for fname, key in (("pessoa.json", "name"), ("perfil.json", "name")):
+        f = d / fname
+        if f.exists():
+            try:
+                v = json.loads(f.read_text(encoding="utf-8")).get(key)
+                if v:
+                    name = v
+                    break
+            except Exception:
+                pass
 
     hits = idx.query(body.message, k=6)
 

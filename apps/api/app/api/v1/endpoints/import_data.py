@@ -35,6 +35,7 @@ async def upload(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     pii_level: str = Form("strict"),
+    job_id: str = Form(""),
 ):
     if pii_level not in _PII_LEVELS:
         raise HTTPException(422, f"pii_level inválido. Use: {sorted(_PII_LEVELS)}")
@@ -57,7 +58,9 @@ async def upload(
     tmp.close()
 
     original = file.filename or Path(tmp.name).name
-    job_id = store.create(original)
+    # se a sessão já existe (fluxo perfil->acervo), importa para dentro dela
+    existing = job_id.strip()
+    job_id = store.create(original, job_id=existing or None)
     background.add_task(_process, job_id, tmp.name, pii_level, original)
     return JobAccepted(job_id=job_id, file=original)
 

@@ -49,10 +49,22 @@ export async function fetchStages(): Promise<Stage[]> {
 }
 
 /** Envia o arquivo; responde na hora com o id da tarefa. */
-export async function startImport(file: File, piiLevel: string): Promise<string> {
+export async function newSession(): Promise<string> {
+  const res = await fetch(`${API}/api/v1/session/new`, { method: "POST" });
+  if (!res.ok) await fail(res, "Não foi possível iniciar.");
+  return (await res.json()).job_id;
+}
+
+/** Envia o arquivo; responde na hora com o id da tarefa. */
+export async function startImport(
+  file: File,
+  piiLevel: string,
+  jobId?: string
+): Promise<string> {
   const form = new FormData();
   form.append("file", file);
   form.append("pii_level", piiLevel);
+  if (jobId) form.append("job_id", jobId);
 
   const res = await fetch(`${API}/api/v1/import/upload`, {
     method: "POST",

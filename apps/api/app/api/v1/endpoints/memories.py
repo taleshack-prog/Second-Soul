@@ -28,7 +28,8 @@ from app.core.config import settings
 
 router = APIRouter(prefix="/memories", tags=["Memórias"])
 
-_TEXT_EXT = {".txt", ".md", ".markdown", ".rtf"}
+_TEXT_EXT = {".txt", ".md", ".markdown", ".rtf", ".csv"}
+_DOC_EXT = {".docx", ".pdf", ".odt", ".doc"}
 _AUDIO_EXT = {".mp3", ".m4a", ".wav", ".ogg", ".opus", ".flac", ".webm"}
 _VIDEO_EXT = {".mp4", ".mov", ".mkv", ".avi", ".m4v"}
 _IMAGE_EXT = {".jpg", ".jpeg", ".png", ".heic", ".webp", ".gif", ".tiff"}
@@ -109,9 +110,10 @@ async def add_file(
     if len(data) > 60 * 1024 * 1024:
         raise HTTPException(413, "Arquivo acima de 60 MB.")
 
-    # --- texto ---
-    if ext in _TEXT_EXT:
-        text = data.decode("utf-8", errors="ignore").strip()
+    # --- texto e documentos (docx, pdf, odt) ---
+    if ext in _TEXT_EXT or ext in _DOC_EXT:
+        text = (_extract_document(data, ext) if ext in _DOC_EXT
+                else data.decode("utf-8", errors="ignore")).strip()
         if len(text) < 10:
             raise HTTPException(422, "Não encontramos texto nesse arquivo.")
         _append_essence(job_id, text, "arquivo", display)
@@ -173,6 +175,40 @@ async def add_file(
         422,
         f'Ainda não lemos arquivos "{ext}". Aceitamos texto (.txt, .md), '
         "áudio, vídeo e imagens.",
+    )
+
+
+def _extract_document(data: bytes, ext: str) -> str:
+    """Extrai o texto de documentos — é neles que moram crônicas e ensaios."""
+    import io
+
+    if ext == ".docx":
+        try:
+            import docx
+        except ModuleNotFoundError:
+            raise HTTPException(503, "Leitura de .docx indisponível no momento.")
+        doc = docx.Document(io.BytesIO(data))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+
+    if ext == ".pdf":
+        try:
+            from pypdf import PdfReader
+        except ModuleNotFoundError:
+            raise HTTPException(503, "Leitura de PDF indisponível no momento.")
+        reader = PdfReader(io.BytesIO(data))
+        return "\n".join((page.extract_text() or "") for page in reader.pages)
+
+    if ext == ".odt":
+        import xml.etree.ElementTree as ET
+        import zipfile
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            xml = z.read("content.xml")
+        root = ET.fromstring(xml)
+        return "\n".join(t.strip() for t in root.itertext() if t.strip())
+
+    raise HTTPException(
+        422,
+        'Arquivos ".doc" (Word antigo) não são lidos. Salve como .docx ou PDF.',
     )
 
 

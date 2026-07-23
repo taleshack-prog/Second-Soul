@@ -33,8 +33,8 @@ class JobStore:
         self._jobs: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
 
-    def create(self, file_name: str) -> str:
-        job_id = uuid.uuid4().hex[:12]
+    def create(self, file_name: str, job_id: str | None = None) -> str:
+        job_id = job_id or uuid.uuid4().hex[:12]
         with self._lock:
             self._jobs[job_id] = {
                 "id": job_id,

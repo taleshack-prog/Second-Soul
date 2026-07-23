@@ -26,9 +26,10 @@ import {
   addFileMemory,
   fetchPieces,
   type Piece,
+  newSession,
 } from "@/lib/api";
 
-type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+type Step = number;
 
 const PII_OPTIONS = [
   { id: "strict", label: "Rigoroso", hint: "Recomendado",
@@ -40,19 +41,22 @@ const PII_OPTIONS = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Preparar o acervo" },
-  { n: "02", title: "Enviar as conversas" },
-  { n: "03", title: "Conferir o acervo" },
-  { n: "04", title: "Separar as vozes" },
-  { n: "05", title: "Perfil da pessoa" },
+  { n: "01", title: "Quem é você" },
+  { n: "02", title: "O seu acervo" },
+  { n: "03", title: "Conversar" },
 ];
+
+// passos do fluxo principal
+const PERFIL = 1, ACERVO = 2, CONVERSA = 3;
+// sub-fluxo opcional: importar conversas de IA
+const IMP_ENVIAR = 10, IMP_CONFERIR = 11, IMP_VOZES = 12;
 
 export default function OnboardingWizard({
   resumeJobId,
 }: {
   resumeJobId?: string;
 } = {}) {
-  const [step, setStep] = useState<Step>(resumeJobId ? 0 : 1);
+  const [step, setStep] = useState<Step>(resumeJobId ? 0 : PERFIL);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [prep, setPrep] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -70,6 +74,15 @@ export default function OnboardingWizard({
   useEffect(() => {
     fetchStages().then(setStages).catch(() => setStages([]));
   }, []);
+
+  // a jornada começa por QUEM a pessoa é: a essência nasce aqui, sem arquivo
+  useEffect(() => {
+    if (resumeJobId || jobId) return;
+    newSession()
+      .then(setJobId)
+      .catch(() => setResumeError("Não conseguimos iniciar. Tente recarregar."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeJobId]);
 
   // retomada pelo link: abre no passo em que a pessoa parou
   useEffect(() => {
@@ -101,8 +114,7 @@ export default function OnboardingWizard({
     try {
       const slim = await extractConversations(file, setPrep);
       setPrep(null);
-      const id = await startImport(slim, pii);
-      setJobId(id);
+      const id = await startImport(slim, pii, jobId ?? undefined);
       const r = await pollUntilDone(id, setJob);
       setResult(r);
       setStep(3);
@@ -134,8 +146,9 @@ export default function OnboardingWizard({
         </div>
         <ol className="space-y-4">
           {STEPS.map((s, i) => {
-            const active = step === i + 1;
-            const done = step > i + 1;
+            const main = step >= 10 ? ACERVO : step;
+            const active = main === i + 1;
+            const done = main > i + 1;
             return (
               <li key={s.n} className="flex items-start gap-3">
                 <span className={`mt-0.5 font-display text-sm ${
@@ -158,44 +171,47 @@ export default function OnboardingWizard({
             Abrindo sua essência…
           </div>
         )}
-        {resumeError && step === 1 && (
+        {resumeError && (
           <p className="mb-6 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
             {resumeError}
           </p>
         )}
-        {step === 1 && <StepPrepare onNext={() => setStep(2)} />}
-        {step === 2 && (
+
+        {step === PERFIL && jobId && (
+          <StepProfile jobId={jobId} personName={personName}
+            setPersonName={setPersonName}
+            onSaved={() => setStep(ACERVO)} />
+        )}
+
+        {step === ACERVO && jobId && (
+          <StepMemories jobId={jobId} personName={personName}
+            onImport={() => setStep(IMP_ENVIAR)}
+            onDone={() => setStep(CONVERSA)} />
+        )}
+
+        {step === CONVERSA && (
+          <StepDone personName={personName} jobId={jobId}
+            onEditProfile={() => setStep(PERFIL)}
+            onAddMemories={() => setStep(ACERVO)} />
+        )}
+
+        {step === IMP_ENVIAR && (
           <StepUpload
             file={file} dragging={dragging} pii={pii} loading={loading}
             error={error} stages={stages} job={job} prep={prep} inputRef={inputRef}
             onPickClick={() => inputRef.current?.click()}
             onFile={setFile} onDrop={onDrop} setDragging={setDragging}
-            setPii={setPii} onRead={handleRead} onBack={() => setStep(1)}
+            setPii={setPii} onRead={handleRead} onBack={() => setStep(ACERVO)}
           />
         )}
-        {step === 3 && result && (
-          <StepReview result={result} onNext={() => setStep(4)} onAgain={reset} />
+        {step === IMP_CONFERIR && result && (
+          <StepReview result={result} onNext={() => setStep(IMP_VOZES)}
+            onAgain={() => { setFile(null); setResult(null); setStep(IMP_ENVIAR); }} />
         )}
-        {step === 4 && jobId && (
-          <StepVoices
-            jobId={jobId}
-            personName={personName}
+        {step === IMP_VOZES && jobId && (
+          <StepVoices jobId={jobId} personName={personName}
             setPersonName={setPersonName}
-            onSaved={() => setStep(5)}
-          />
-        )}
-        {step === 5 && jobId && (
-          <StepProfile jobId={jobId} personName={personName}
-            onSaved={() => setStep(6)} />
-        )}
-        {step === 6 && (
-          <StepDone personName={personName} jobId={jobId}
-            onEditProfile={() => setStep(5)}
-            onAddMemories={() => setStep(7)} />
-        )}
-        {step === 7 && jobId && (
-          <StepMemories jobId={jobId} personName={personName}
-            onBack={() => setStep(6)} />
+            onSaved={() => setStep(ACERVO)} />
         )}
       </section>
     </main>
@@ -584,8 +600,9 @@ function StepVoices({ jobId, personName, setPersonName, onSaved }: {
 
 /* ---------------- Passo 5: perfil ---------------- */
 
-function StepProfile({ jobId, personName, onSaved }: {
-  jobId: string; personName: string; onSaved: () => void;
+function StepProfile({ jobId, personName, setPersonName, onSaved }: {
+  jobId: string; personName: string;
+  setPersonName: (s: string) => void; onSaved: () => void;
 }) {
   const [fields, setFields] = useState<ProfileField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -625,9 +642,9 @@ function StepProfile({ jobId, personName, onSaved }: {
 
   return (
     <div>
-      <Eyebrow>Com as palavras dela</Eyebrow>
+      <Eyebrow>Comece por você</Eyebrow>
       <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink">
-        Como {personName || "a pessoa"} se descreve?
+        Quem é a pessoa que ficará guardada aqui?
       </h1>
       <p className="mt-5 text-[17px] leading-relaxed text-muted">
         As conversas mostram como a pessoa é sem querer. Aqui é o contrário: ela
@@ -641,6 +658,13 @@ function StepProfile({ jobId, personName, onSaved }: {
           Retomamos o que já estava declarado. Edite o que quiser e salve de novo.
         </p>
       )}
+
+      <div className="mt-7">
+        <label className="text-ink">Nome</label>
+        <input value={personName} onChange={(e) => setPersonName(e.target.value)}
+          placeholder="Como quer ser chamada nesta essência"
+          className="mt-2 w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink placeholder:text-muted/60 focus:border-soul focus:outline-none" />
+      </div>
 
       <div className="mt-8 space-y-6">
         {fields.map((f) => (
@@ -670,8 +694,8 @@ function StepProfile({ jobId, personName, onSaved }: {
         <button onClick={handleSave} disabled={busy}
           className="rounded-full bg-soul px-6 py-3 font-medium text-base text-[#241703] transition-transform hover:-translate-y-0.5 disabled:opacity-40">
           {busy ? "Salvando…" : filled > 0
-            ? `Salvar perfil (${filled} campo${filled > 1 ? "s" : ""})`
-            : "Pular por enquanto"}
+            ? `Continuar (${filled} campo${filled > 1 ? "s" : ""} preenchido${filled > 1 ? "s" : ""})`
+            : "Continuar sem preencher"}
         </button>
       </div>
     </div>
@@ -832,11 +856,13 @@ function StepDone({
 function StepMemories({
   jobId,
   personName,
-  onBack,
+  onImport,
+  onDone,
 }: {
   jobId: string;
   personName: string;
-  onBack: () => void;
+  onImport: () => void;
+  onDone: () => void;
 }) {
   const [mode, setMode] = useState<"escrever" | "arquivo">("escrever");
   const [title, setTitle] = useState("");
@@ -897,6 +923,17 @@ function StepMemories({
         algo que você criou. O que for escrito ou narrado passa a fazer parte da
         essência; imagens ficam no acervo com as suas palavras ao lado.
       </p>
+
+      <div className="mt-7 rounded-2xl border border-line bg-surface p-5">
+        <p className="text-sm text-ink">
+          <b>Já conversa com alguma IA?</b> Anos de conversas guardam jeito de
+          pensar e valores. Dá para trazer esse acervo de uma vez.
+        </p>
+        <button onClick={onImport}
+          className="mt-3 rounded-full border border-soul/50 px-4 py-1.5 text-sm text-soul transition-colors hover:bg-soul/10">
+          Importar conversas do ChatGPT
+        </button>
+      </div>
 
       <div className="mt-7 flex gap-2">
         {(["escrever", "arquivo"] as const).map((m) => (
@@ -962,8 +999,8 @@ function StepMemories({
           className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5 disabled:opacity-40">
           {busy ? "Guardando…" : "Guardar no acervo"}
         </button>
-        <button onClick={onBack} className="text-sm text-muted hover:text-ink">
-          Voltar à conversa
+        <button onClick={onDone} className="text-sm text-muted hover:text-ink">
+          Conversar com a essência
         </button>
       </div>
 
