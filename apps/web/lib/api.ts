@@ -276,3 +276,52 @@ export async function fetchSession(jobId: string): Promise<SessionState> {
   if (!res.ok) await fail(res, "Não encontramos essa essência.");
   return res.json();
 }
+
+/* ---------- acervo: novas memórias ---------- */
+
+export type Piece = {
+  id: string;
+  kind: "texto" | "imagem" | "audio" | "video";
+  title: string;
+  narration: string;
+  file?: string;
+  added_at: number;
+};
+
+export async function addTextMemory(
+  jobId: string,
+  title: string,
+  content: string
+): Promise<{ words: number; title: string }> {
+  const res = await fetch(`${API}/api/v1/memories/${jobId}/text`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível guardar essa memória.");
+  return res.json();
+}
+
+export async function addFileMemory(
+  jobId: string,
+  file: File,
+  title: string,
+  narration: string
+): Promise<{ kind: string; title: string; transcript?: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("title", title);
+  form.append("narration", narration);
+  const res = await fetch(`${API}/api/v1/memories/${jobId}/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) await fail(res, "Não foi possível guardar esse arquivo.");
+  return res.json();
+}
+
+export async function fetchPieces(jobId: string): Promise<Piece[]> {
+  const res = await fetch(`${API}/api/v1/memories/${jobId}`);
+  if (!res.ok) return [];
+  return (await res.json()).pieces ?? [];
+}

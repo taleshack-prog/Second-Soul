@@ -22,9 +22,13 @@ import {
   fetchSession,
   extractConversations,
   fetchProfile,
+  addTextMemory,
+  addFileMemory,
+  fetchPieces,
+  type Piece,
 } from "@/lib/api";
 
-type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 const PII_OPTIONS = [
   { id: "strict", label: "Rigoroso", hint: "Recomendado",
@@ -186,7 +190,12 @@ export default function OnboardingWizard({
         )}
         {step === 6 && (
           <StepDone personName={personName} jobId={jobId}
-            onEditProfile={() => setStep(5)} />
+            onEditProfile={() => setStep(5)}
+            onAddMemories={() => setStep(7)} />
+        )}
+        {step === 7 && jobId && (
+          <StepMemories jobId={jobId} personName={personName}
+            onBack={() => setStep(6)} />
         )}
       </section>
     </main>
@@ -677,10 +686,12 @@ function StepDone({
   personName,
   jobId,
   onEditProfile,
+  onAddMemories,
 }: {
   personName: string;
   jobId: string | null;
   onEditProfile: () => void;
+  onAddMemories: () => void;
 }) {
   const [ready, setReady] = useState<TwinReady>({ status: "building" });
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -755,6 +766,11 @@ function StepDone({
               className="text-soul underline underline-offset-4 hover:opacity-80">
               Revisar o perfil
             </button>
+            {" · "}
+            <button onClick={onAddMemories}
+              className="text-soul underline underline-offset-4 hover:opacity-80">
+              Acrescentar memórias
+            </button>
           </p>
 
           <div className="mt-6 max-h-[420px] space-y-3 overflow-y-auto pr-1">
@@ -806,6 +822,175 @@ function StepDone({
             </button>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Passo 7: acrescentar memórias ---------------- */
+
+function StepMemories({
+  jobId,
+  personName,
+  onBack,
+}: {
+  jobId: string;
+  personName: string;
+  onBack: () => void;
+}) {
+  const [mode, setMode] = useState<"escrever" | "arquivo">("escrever");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [narration, setNarration] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pieces, setPieces] = useState<Piece[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchPieces(jobId).then(setPieces).catch(() => setPieces([]));
+  }, [jobId]);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    setMsg(null);
+    try {
+      if (mode === "escrever") {
+        const r = await addTextMemory(jobId, title, content);
+        setMsg(`Guardado: ${r.title} (${r.words} palavras).`);
+        setTitle("");
+        setContent("");
+      } else {
+        if (!file) return;
+        const r = await addFileMemory(jobId, file, title, narration);
+        setMsg(
+          r.transcript
+            ? `Transcrito e guardado: ${r.title}.`
+            : `Guardado: ${r.title}.`
+        );
+        setFile(null);
+        setTitle("");
+        setNarration("");
+        if (fileRef.current) fileRef.current.value = "";
+      }
+      setPieces(await fetchPieces(jobId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Algo deu errado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isImage = file ? /\.(jpe?g|png|heic|webp|gif|tiff)$/i.test(file.name) : false;
+
+  return (
+    <div>
+      <Eyebrow>O acervo</Eyebrow>
+      <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink">
+        O que mais {personName || "você"} quer deixar guardado?
+      </h1>
+      <p className="mt-5 text-[17px] leading-relaxed text-muted">
+        Uma crônica, uma história de família, uma decisão difícil, uma foto de
+        algo que você criou. O que for escrito ou narrado passa a fazer parte da
+        essência; imagens ficam no acervo com as suas palavras ao lado.
+      </p>
+
+      <div className="mt-7 flex gap-2">
+        {(["escrever", "arquivo"] as const).map((m) => (
+          <button key={m} onClick={() => setMode(m)}
+            className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+              mode === m
+                ? "border-soul bg-soul/15 text-soul"
+                : "border-line bg-surface text-muted hover:text-ink"
+            }`}>
+            {m === "escrever" ? "Escrever agora" : "Enviar arquivo"}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-5 space-y-4">
+        <input value={title} onChange={(e) => setTitle(e.target.value)}
+          placeholder="Um título — ex.: O bonsai do meu pai"
+          className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink placeholder:text-muted/60 focus:border-soul focus:outline-none" />
+
+        {mode === "escrever" ? (
+          <textarea value={content} onChange={(e) => setContent(e.target.value)}
+            rows={10} placeholder="Conte com as suas palavras…"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[15px] leading-relaxed text-ink placeholder:text-muted/50 focus:border-soul focus:outline-none" />
+        ) : (
+          <>
+            <div onClick={() => fileRef.current?.click()} role="button" tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileRef.current?.click()}
+              className={`cursor-pointer rounded-2xl border px-6 py-8 text-center transition-colors ${
+                file ? "border-soul/50 bg-surface" : "border-dashed border-line bg-surface hover:border-soul/40"
+              }`}>
+              <p className="text-ink">{file ? file.name : "Escolher arquivo"}</p>
+              <p className="mt-1 text-sm text-muted">
+                texto, áudio, vídeo ou imagem — áudio e vídeo até 25 MB
+              </p>
+              <input ref={fileRef} type="file" className="hidden"
+                accept=".txt,.md,.mp3,.m4a,.wav,.ogg,.mp4,.mov,.jpg,.jpeg,.png,.heic,.webp"
+                onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
+            </div>
+            {isImage && (
+              <textarea value={narration} onChange={(e) => setNarration(e.target.value)}
+                rows={4}
+                placeholder="Conte sobre esta imagem — é isso que a essência vai guardar."
+                className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-[15px] leading-relaxed text-ink placeholder:text-muted/50 focus:border-soul focus:outline-none" />
+            )}
+          </>
+        )}
+      </div>
+
+      {msg && (
+        <p className="mt-4 rounded-xl border border-soul/30 bg-soul/5 p-4 text-sm text-ink">
+          {msg}
+        </p>
+      )}
+      {error && (
+        <p className="mt-4 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-7 flex items-center gap-4">
+        <button onClick={save}
+          disabled={busy || (mode === "escrever" ? content.trim().length < 10 : !file)}
+          className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5 disabled:opacity-40">
+          {busy ? "Guardando…" : "Guardar no acervo"}
+        </button>
+        <button onClick={onBack} className="text-sm text-muted hover:text-ink">
+          Voltar à conversa
+        </button>
+      </div>
+
+      {pieces.length > 0 && (
+        <div className="mt-10">
+          <p className="text-sm text-muted">
+            {pieces.length} peça{pieces.length > 1 ? "s" : ""} no acervo
+          </p>
+          <div className="mt-3 space-y-2">
+            {pieces.slice(0, 8).map((p) => (
+              <div key={p.id} className="rounded-xl border border-line bg-surface p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase tracking-wide text-soul">
+                    {p.kind}
+                  </span>
+                  <span className="text-ink">{p.title}</span>
+                </div>
+                {p.narration && (
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    {p.narration.slice(0, 160)}
+                    {p.narration.length > 160 && "…"}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
