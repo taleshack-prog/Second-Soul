@@ -88,6 +88,48 @@ export async function pollUntilDone(
   }
 }
 
+
+/* ---------- extração no navegador ---------- */
+
+/**
+ * O export do ChatGPT traz TUDO: imagens geradas, áudios, anexos — centenas de
+ * MB que o pipeline descarta. Só os conversations*.json interessam.
+ *
+ * Extraímos no próprio navegador e enviamos apenas o essencial. Um export de
+ * 315 MB vira poucos MB: o envio deixa de estourar tempo e de gastar a internet
+ * de quem está do outro lado.
+ */
+export async function extractConversations(
+  file: File,
+  onProgress?: (msg: string) => void
+): Promise<File> {
+  if (!file.name.toLowerCase().endsWith(".zip")) return file;
+
+  const JSZip = (await import("jszip")).default;
+  onProgress?.("Abrindo o arquivo…");
+  const zip = await JSZip.loadAsync(file);
+
+  const wanted = Object.keys(zip.files).filter(
+    (n) => /conversations.*\.json$/i.test(n) && !zip.files[n].dir
+  );
+  if (wanted.length === 0) return file; // deixa a API diagnosticar
+
+  onProgress?.("Separando as conversas…");
+  const out = new JSZip();
+  for (const name of wanted) {
+    const content = await zip.files[name].async("uint8array");
+    out.file(name.split("/").pop() || name, content);
+  }
+
+  onProgress?.("Preparando o envio…");
+  const blob = await out.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+  return new File([blob], "conversas.zip", { type: "application/zip" });
+}
+
 /* ---------- separação de vozes ---------- */
 
 export type Theme = { term: string; messages: number };

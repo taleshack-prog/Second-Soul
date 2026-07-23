@@ -20,6 +20,7 @@ import {
   twinTalk,
   type TwinReady,
   fetchSession,
+  extractConversations,
 } from "@/lib/api";
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -48,6 +49,7 @@ export default function OnboardingWizard({
 } = {}) {
   const [step, setStep] = useState<Step>(resumeJobId ? 0 : 1);
   const [resumeError, setResumeError] = useState<string | null>(null);
+  const [prep, setPrep] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pii, setPii] = useState("strict");
   const [dragging, setDragging] = useState(false);
@@ -92,7 +94,9 @@ export default function OnboardingWizard({
     setError(null);
     setJob(null);
     try {
-      const id = await startImport(file, pii);
+      const slim = await extractConversations(file, setPrep);
+      setPrep(null);
+      const id = await startImport(slim, pii);
       setJobId(id);
       const r = await pollUntilDone(id, setJob);
       setResult(r);
@@ -101,6 +105,7 @@ export default function OnboardingWizard({
       setError(err instanceof Error ? err.message : "Algo deu errado.");
     } finally {
       setLoading(false);
+      setPrep(null);
     }
   }
 
@@ -157,7 +162,7 @@ export default function OnboardingWizard({
         {step === 2 && (
           <StepUpload
             file={file} dragging={dragging} pii={pii} loading={loading}
-            error={error} stages={stages} job={job} inputRef={inputRef}
+            error={error} stages={stages} job={job} prep={prep} inputRef={inputRef}
             onPickClick={() => inputRef.current?.click()}
             onFile={setFile} onDrop={onDrop} setDragging={setDragging}
             setPii={setPii} onRead={handleRead} onBack={() => setStep(1)}
@@ -236,12 +241,13 @@ function StepPrepare({ onNext }: { onNext: () => void }) {
 function StepUpload(props: {
   file: File | null; dragging: boolean; pii: string; loading: boolean;
   error: string | null; stages: Stage[]; job: JobStatus | null;
+  prep: string | null;
   inputRef: React.RefObject<HTMLInputElement>;
   onPickClick: () => void; onFile: (f: File) => void;
   onDrop: (e: React.DragEvent) => void; setDragging: (b: boolean) => void;
   setPii: (s: string) => void; onRead: () => void; onBack: () => void;
 }) {
-  const { file, dragging, pii, loading, error, stages, job, inputRef,
+  const { file, dragging, pii, loading, error, stages, job, prep, inputRef,
     onPickClick, onFile, onDrop, setDragging, setPii, onRead, onBack } = props;
 
   return (
@@ -309,7 +315,16 @@ function StepUpload(props: {
         </div>
       </fieldset>
 
-      {loading && <ImportProgress stages={stages} job={job} />}
+      {loading && prep && (
+        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-line bg-surface p-5"
+          role="status" aria-live="polite">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-soul" />
+          <p className="text-sm text-muted">
+            {prep} <span className="text-muted/70">Isso acontece no seu aparelho — nada foi enviado ainda.</span>
+          </p>
+        </div>
+      )}
+      {loading && !prep && <ImportProgress stages={stages} job={job} />}
 
       {error && (
         <p className="mt-5 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
