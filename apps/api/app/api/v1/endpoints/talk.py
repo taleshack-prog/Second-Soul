@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core import sessions
 
 router = APIRouter(prefix="/twin", tags=["Gêmeo Digital"])
 
@@ -25,7 +26,7 @@ _INDEX_CACHE: dict[str, object] = {}
 
 
 def _session_dir(job_id: str) -> Path:
-    return Path(tempfile.gettempdir()) / "secondsoul_sessions" / job_id
+    return sessions.session_dir(job_id)
 
 
 @router.get("/ready/{job_id}")

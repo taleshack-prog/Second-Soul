@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Uploa
 from app.core.config import settings
 from app.schemas.import_data import ImportPreviewItem, ImportResult, JobAccepted, JobStatus
 from app.services.jobs import STAGES, store
+from app.core import sessions
 
 router = APIRouter(prefix="/import", tags=["Importação"])
 
@@ -146,8 +147,7 @@ def _save_session(job_id: str, items) -> None:
     (separar vozes, perfil). TTL segue o do job store."""
     import json as _json
 
-    d = Path(tempfile.gettempdir()) / "secondsoul_sessions" / job_id
-    d.mkdir(parents=True, exist_ok=True)
+    d = sessions.session_dir(job_id, create=True)
     with open(d / "acervo.jsonl", "w", encoding="utf-8") as fh:
         for it in items:
             fh.write(_json.dumps(it.to_dict(), ensure_ascii=False) + "\n")

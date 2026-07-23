@@ -203,3 +203,25 @@ export async function twinTalk(
   if (!res.ok) await fail(res, "A essência não conseguiu responder agora.");
   return res.json();
 }
+
+/* ---------- retomar pelo link ---------- */
+
+export type SessionState = {
+  found: boolean;
+  job_id: string;
+  step: number;
+  has_acervo: boolean;
+  has_essencia: boolean;
+  has_perfil: boolean;
+  twin_ready: boolean;
+  person_name: string;
+  memories: number;
+  acervo: number;
+  essencia: number;
+};
+
+export async function fetchSession(jobId: string): Promise<SessionState> {
+  const res = await fetch(`${API}/api/v1/session/${jobId}`);
+  if (!res.ok) await fail(res, "Não encontramos essa essência.");
+  return res.json();
+}

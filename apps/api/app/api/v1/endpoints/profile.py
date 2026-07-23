@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from app.core import sessions
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/profile", tags=["Perfil"])
@@ -29,7 +30,7 @@ except ModuleNotFoundError:  # API sobe mesmo sem o pacote em dev
 
 
 def _session_dir(job_id: str) -> Path:
-    return Path(tempfile.gettempdir()) / "secondsoul_sessions" / job_id
+    return sessions.session_dir(job_id)
 
 
 @router.get("/fields")

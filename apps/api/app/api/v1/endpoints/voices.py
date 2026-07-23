@@ -19,6 +19,7 @@ from collections import Counter
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from app.core import sessions
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/voices", tags=["Separação de vozes"])
@@ -33,7 +34,7 @@ _STOP = set(
 
 
 def _session_dir(job_id: str) -> Path:
-    return Path(tempfile.gettempdir()) / "secondsoul_sessions" / job_id
+    return sessions.session_dir(job_id)
 
 
 def _load_user_rows(job_id: str) -> list[dict]:
