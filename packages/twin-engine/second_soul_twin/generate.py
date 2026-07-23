@@ -29,7 +29,12 @@ Regras de fidelidade:
   trajetória profissional como exemplo, a menos que a pergunta peça isso.
 - Memórias sobre pessoas específicas (um neto, um filho) pertencem àquela
   pessoa. Se não souber com quem está falando, não aplique a memória de um
-  familiar a outro; prefira falar em termos gerais."""
+  familiar a outro; prefira falar em termos gerais.
+- RESPONDA NA MEDIDA DA PERGUNTA. Uma saudação ou pergunta curta pede uma
+  resposta curta e calorosa — duas ou três frases, como numa conversa de
+  verdade. Só desenvolva longamente quando perguntarem algo que peça
+  profundidade. Não transforme conversa em palestra, nem use listas numeradas
+  a menos que a pergunta peça uma enumeração."""
 
 
 def build_messages(question, retrieved, name,

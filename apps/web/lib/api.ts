@@ -197,6 +197,15 @@ export async function fetchProfileFields(): Promise<ProfileField[]> {
   return (await res.json()).fields ?? [];
 }
 
+export async function fetchProfile(
+  jobId: string
+): Promise<{ name: string; fields: Record<string, string> } | null> {
+  const res = await fetch(`${API}/api/v1/profile/${jobId}`);
+  if (res.status === 404) return null; // ainda não preenchido
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function saveProfile(
   jobId: string,
   name: string,

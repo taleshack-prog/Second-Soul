@@ -22,7 +22,10 @@ from app.core import sessions
 
 router = APIRouter(prefix="/twin", tags=["Gêmeo Digital"])
 
-_INDEX_CACHE: dict[str, object] = {}
+# cache do índice por sessão: (mtime do meta.json, índice)
+# o mtime evita servir um índice velho depois que o perfil foi salvo
+# e o gêmeo foi reindexado — bug real: o perfil não fazia efeito.
+_INDEX_CACHE: dict[str, tuple[float, object]] = {}
 
 
 def _session_dir(job_id: str) -> Path:
@@ -56,11 +59,14 @@ async def talk(body: TalkIn):
         raise HTTPException(409, "A essência ainda está sendo preparada. "
                                  "Aguarde alguns instantes e tente de novo.")
 
-    idx = _INDEX_CACHE.get(body.job_id)
-    if idx is None:
+    meta_mtime = (idx_dir / "meta.json").stat().st_mtime
+    cached = _INDEX_CACHE.get(body.job_id)
+    if cached is None or cached[0] != meta_mtime:
         from second_soul_twin import TwinIndex
         idx = TwinIndex.load(idx_dir)
-        _INDEX_CACHE[body.job_id] = idx
+        _INDEX_CACHE[body.job_id] = (meta_mtime, idx)
+    else:
+        idx = cached[1]
 
     person = json.loads((d / "pessoa.json").read_text(encoding="utf-8"))
     name = person.get("name") or "a pessoa"

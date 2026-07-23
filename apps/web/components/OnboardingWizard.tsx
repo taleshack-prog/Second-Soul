@@ -21,6 +21,7 @@ import {
   type TwinReady,
   fetchSession,
   extractConversations,
+  fetchProfile,
 } from "@/lib/api";
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -183,7 +184,10 @@ export default function OnboardingWizard({
           <StepProfile jobId={jobId} personName={personName}
             onSaved={() => setStep(6)} />
         )}
-        {step === 6 && <StepDone personName={personName} jobId={jobId} />}
+        {step === 6 && (
+          <StepDone personName={personName} jobId={jobId}
+            onEditProfile={() => setStep(5)} />
+        )}
       </section>
     </main>
   );
@@ -579,9 +583,21 @@ function StepProfile({ jobId, personName, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [loaded, setLoaded] = useState(false);
+
   useEffect(() => {
     fetchProfileFields().then(setFields).catch(() => setFields([]));
   }, []);
+
+  // carrega o que já foi declarado — o formulário abria em branco mesmo
+  // com o perfil salvo, o que parecia perda de dados.
+  useEffect(() => {
+    fetchProfile(jobId)
+      .then((p) => {
+        if (p?.fields) setValues(p.fields);
+      })
+      .finally(() => setLoaded(true));
+  }, [jobId]);
 
   const filled = Object.values(values).filter((v) => v.trim()).length;
 
@@ -610,6 +626,12 @@ function StepProfile({ jobId, personName, onSaved }: {
         só o que ela quiser. Todos os campos são opcionais, e o que ela
         declarar pesa mais que tudo na essência.
       </p>
+
+      {loaded && filled > 0 && (
+        <p className="mt-6 rounded-xl border border-soul/30 bg-soul/5 p-4 text-sm text-ink">
+          Retomamos o que já estava declarado. Edite o que quiser e salve de novo.
+        </p>
+      )}
 
       <div className="mt-8 space-y-6">
         {fields.map((f) => (
@@ -651,7 +673,15 @@ function StepProfile({ jobId, personName, onSaved }: {
 
 type Msg = { from: "you" | "twin"; text: string };
 
-function StepDone({ personName, jobId }: { personName: string; jobId: string | null }) {
+function StepDone({
+  personName,
+  jobId,
+  onEditProfile,
+}: {
+  personName: string;
+  jobId: string | null;
+  onEditProfile: () => void;
+}) {
   const [ready, setReady] = useState<TwinReady>({ status: "building" });
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -720,7 +750,11 @@ function StepDone({ personName, jobId }: { personName: string; jobId: string | n
         <>
           <p className="mt-4 text-sm text-muted">
             {(ready.memories ?? 0).toLocaleString("pt-BR")} memórias sustentam
-            esta conversa.
+            esta conversa.{" "}
+            <button onClick={onEditProfile}
+              className="text-soul underline underline-offset-4 hover:opacity-80">
+              Revisar o perfil
+            </button>
           </p>
 
           <div className="mt-6 max-h-[420px] space-y-3 overflow-y-auto pr-1">
