@@ -102,7 +102,9 @@ export default function OnboardingWizard({
         setJobId(st.job_id);
         if (st.person_name) setPersonName(st.person_name);
         const ok = await getConsent(st.job_id);
-        setStep(ok ? ((st.step as Step) ?? PERFIL) : CONSENTIMENTO);
+        const known = [PERFIL, ACERVO, CONVERSA];
+        const target = known.includes(st.step) ? st.step : ACERVO;
+        setStep(ok ? target : CONSENTIMENTO);
       })
       .catch((e) => {
         setResumeError(e instanceof Error ? e.message : "Link não encontrado.");

@@ -61,13 +61,13 @@ def state(job_id: str) -> dict[str, Any]:
         except Exception:
             person = {}
 
-    # em que passo do wizard retomar
-    if has_index or has_essencia:
-        step = 6 if has_index else 5
-    elif has_acervo:
-        step = 4
-    else:
+    # 1 = quem e voce · 2 = o seu acervo · 3 = conversar
+    if has_index:
+        step = 3
+    elif has_essencia or has_acervo or has_perfil:
         step = 2
+    else:
+        step = 1
 
     return {
         "found": True,
