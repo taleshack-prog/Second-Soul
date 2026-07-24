@@ -59,6 +59,8 @@ def _allowed_origins() -> list[str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins(),
+    # a Vercel gera um endereco por deploy alem do principal
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
