@@ -1,0 +1,18 @@
+# segredos e dados nunca entram na imagem
+.env
+*.env
+apps/api/.env
+apps/web/.env.local
+*.jsonl
+perfil*.json
+.twin_index/
+EXPORT-*.zip
+.secondsoul_data/
+
+# lixo de build
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+.git/
