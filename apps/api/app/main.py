@@ -8,6 +8,7 @@ Correções vs. spec:
   - `create_all` no lifespan só roda em DEBUG; em prod usa Alembic.
 """
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -35,13 +36,22 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     lifespan=lifespan,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
+    docs_url="/docs" if os.environ.get("EXPOSE_DOCS") == "true" else None,
+    redoc_url=None,
 )
+
+def _allowed_origins() -> list[str]:
+    """Restritivo por padrao: seguranca nao pode depender de variavel."""
+    origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    front = (settings.FRONTEND_URL or "").strip().rstrip("/")
+    if front and front not in origins:
+        origins.append(front)
+    return origins
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else [settings.FRONTEND_URL],
+    allow_origins=_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
