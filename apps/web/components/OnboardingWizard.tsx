@@ -654,7 +654,7 @@ function StepProfile({ jobId, personName, setPersonName, onSaved }: {
     setBusy(true);
     setError(null);
     try {
-      await saveProfile(jobId, personName || "a pessoa", values);
+      await saveProfile(jobId, personName.trim(), values);
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível salvar.");

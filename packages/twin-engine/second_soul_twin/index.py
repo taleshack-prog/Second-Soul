@@ -69,8 +69,26 @@ class TwinIndex:
 
         # verdade declarada (perfil) pesa mais que a inferida (chats)
         boosted = sims * self.weights if self.weights is not None else sims
+        order = list(np.argsort(-boosted))
 
-        top = np.argsort(-boosted)[:k]
+        # assento garantido para o que a pessoa DECLAROU: sem isso, cronicas
+        # longas vencem sempre a disputa com campos curtos de perfil.
+        is_profile = [m.get("source") == "profile" for m in self.meta]
+        chosen = []
+        if any(is_profile):
+            for i in order:
+                if is_profile[i] and len(chosen) < 2:
+                    chosen.append(i)
+                if len(chosen) >= 2:
+                    break
+        for i in order:
+            if len(chosen) >= k:
+                break
+            if i not in chosen:
+                chosen.append(i)
+        chosen.sort(key=lambda i: -boosted[i])
+
+        top = chosen
         return [
             {"score": float(sims[i]), "boosted": float(boosted[i]),
              "content": self.meta[i]["content"],

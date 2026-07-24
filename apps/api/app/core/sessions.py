@@ -55,11 +55,16 @@ def state(job_id: str) -> dict[str, Any]:
     has_index = (d / "twin_index" / "meta.json").exists()
 
     person: dict[str, Any] = {}
-    if (d / "pessoa.json").exists():
-        try:
-            person = json.loads((d / "pessoa.json").read_text(encoding="utf-8"))
-        except Exception:
-            person = {}
+    for fname in ("pessoa.json", "perfil.json"):
+        f = d / fname
+        if f.exists():
+            try:
+                blob = json.loads(f.read_text(encoding="utf-8"))
+                if blob.get("name"):
+                    person = blob
+                    break
+            except Exception:
+                pass
 
     # 1 = quem e voce · 2 = o seu acervo · 3 = conversar
     if has_index:
