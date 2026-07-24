@@ -28,6 +28,10 @@ import {
   type Piece,
   newSession,
   pieceImageUrl,
+  getConsent,
+  acceptConsent,
+  exportUrl,
+  deleteSession,
 } from "@/lib/api";
 
 type Step = number;
@@ -50,6 +54,7 @@ const STEPS = [
 // passos do fluxo principal
 const PERFIL = 1, ACERVO = 2, CONVERSA = 3;
 const ALBUM = 4;
+const CONSENTIMENTO = 0.5;
 // sub-fluxo opcional: importar conversas de IA
 const IMP_ENVIAR = 10, IMP_CONFERIR = 11, IMP_VOZES = 12;
 
@@ -58,7 +63,7 @@ export default function OnboardingWizard({
 }: {
   resumeJobId?: string;
 } = {}) {
-  const [step, setStep] = useState<Step>(resumeJobId ? 0 : PERFIL);
+  const [step, setStep] = useState<Step>(0);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [prep, setPrep] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -81,7 +86,10 @@ export default function OnboardingWizard({
   useEffect(() => {
     if (resumeJobId || jobId) return;
     newSession()
-      .then(setJobId)
+      .then(async (id) => {
+        setJobId(id);
+        setStep((await getConsent(id)) ? PERFIL : CONSENTIMENTO);
+      })
       .catch(() => setResumeError("Não conseguimos iniciar. Tente recarregar."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeJobId]);
@@ -90,10 +98,11 @@ export default function OnboardingWizard({
   useEffect(() => {
     if (!resumeJobId) return;
     fetchSession(resumeJobId)
-      .then((st) => {
+      .then(async (st) => {
         setJobId(st.job_id);
         if (st.person_name) setPersonName(st.person_name);
-        setStep((st.step as Step) ?? 2);
+        const ok = await getConsent(st.job_id);
+        setStep(ok ? ((st.step as Step) ?? PERFIL) : CONSENTIMENTO);
       })
       .catch((e) => {
         setResumeError(e instanceof Error ? e.message : "Link não encontrado.");
@@ -177,6 +186,10 @@ export default function OnboardingWizard({
           <p className="mb-6 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
             {resumeError}
           </p>
+        )}
+
+        {step === CONSENTIMENTO && jobId && (
+          <StepConsent jobId={jobId} onAccept={() => setStep(PERFIL)} />
         )}
 
         {step === PERFIL && jobId && (
@@ -804,6 +817,9 @@ function StepDone({
               Acrescentar memórias
             </button>
           </p>
+          {jobId && <DataRights jobId={jobId} />}
+          <p className="hidden">
+          </p>
 
           <div className="mt-6 max-h-[420px] space-y-3 overflow-y-auto pr-1">
             {msgs.length === 0 && (
@@ -1042,6 +1058,141 @@ function StepMemories({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------------- Consentimento ---------------- */
+
+function StepConsent({
+  jobId,
+  onAccept,
+}: {
+  jobId: string;
+  onAccept: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function accept() {
+    setBusy(true);
+    setError(null);
+    try {
+      await acceptConsent(jobId);
+      onAccept();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <Eyebrow>Antes de começar</Eyebrow>
+      <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink">
+        O que você guardar aqui é seu.
+      </h1>
+      <p className="mt-5 text-[17px] leading-relaxed text-muted">
+        Você está prestes a confiar memórias a este lugar. Antes disso, o que
+        precisa saber — sem letra miúda.
+      </p>
+
+      <ul className="mt-8 space-y-4 text-[15px] leading-relaxed text-muted">
+        <li className="rounded-xl border border-line bg-surface p-4">
+          Suas memórias ficam em servidores nos <b className="text-ink">Estados
+          Unidos</b>, e trechos delas são enviados a um provedor de IA para gerar
+          as conversas.
+        </li>
+        <li className="rounded-xl border border-line bg-surface p-4">
+          O <b className="text-ink">link do seu acervo é a chave</b> — não há
+          senha ainda. Quem tiver o link entra.
+        </li>
+        <li className="rounded-xl border border-line bg-surface p-4">
+          Você pode <b className="text-ink">levar tudo embora</b> ou{" "}
+          <b className="text-ink">apagar para sempre</b>, quando quiser.
+        </li>
+        <li className="rounded-xl border border-line bg-surface p-4">
+          Isto é uma <b className="text-ink">versão de testes</b>. Guarde os
+          originais com você — não use como único lugar do que é insubstituível.
+        </li>
+      </ul>
+
+      {error && (
+        <p className="mt-5 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-8 flex flex-wrap items-center gap-4">
+        <button onClick={accept} disabled={busy}
+          className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5 disabled:opacity-40">
+          {busy ? "Registrando…" : "Entendi e quero começar"}
+        </button>
+        <a href="/privacidade" target="_blank" rel="noopener noreferrer"
+          className="text-sm text-muted underline underline-offset-4 hover:text-ink">
+          Ler a página de privacidade
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- direitos sobre os dados ---------------- */
+
+function DataRights({ jobId }: { jobId: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function remove() {
+    try {
+      await deleteSession(jobId);
+      setDone(true);
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 2500);
+    } catch {
+      setConfirming(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <p className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm text-ink">
+        Apagamos tudo. Não guardamos cópia.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 text-sm text-muted">
+      <a href={exportUrl(jobId)}
+        className="underline underline-offset-4 hover:text-ink">
+        Levar meus dados
+      </a>
+      {" · "}
+      {confirming ? (
+        <span className="text-ink">
+          Apagar tudo para sempre?{" "}
+          <button onClick={remove} className="text-soul underline underline-offset-4">
+            Sim, apagar
+          </button>
+          {" / "}
+          <button onClick={() => setConfirming(false)} className="underline underline-offset-4">
+            não
+          </button>
+        </span>
+      ) : (
+        <button onClick={() => setConfirming(true)}
+          className="underline underline-offset-4 hover:text-ink">
+          Apagar tudo
+        </button>
+      )}
+      {" · "}
+      <a href="/privacidade" target="_blank" rel="noopener noreferrer"
+        className="underline underline-offset-4 hover:text-ink">
+        Privacidade
+      </a>
     </div>
   );
 }

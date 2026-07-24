@@ -341,3 +341,36 @@ export async function fetchPieces(jobId: string): Promise<Piece[]> {
   if (!res.ok) return [];
   return (await res.json()).pieces ?? [];
 }
+
+/* ---------- consentimento e direitos ---------- */
+
+export async function getConsent(jobId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API}/api/v1/session/${jobId}/consent`);
+    if (!res.ok) return false;
+    return (await res.json()).accepted === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function acceptConsent(jobId: string): Promise<void> {
+  const res = await fetch(`${API}/api/v1/session/${jobId}/consent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accepted: true, version: "1.0" }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível registrar o consentimento.");
+}
+
+export function exportUrl(jobId: string): string {
+  return `${API}/api/v1/session/${jobId}/export`;
+}
+
+export async function deleteSession(jobId: string): Promise<void> {
+  const res = await fetch(
+    `${API}/api/v1/session/${jobId}?confirm=APAGAR`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) await fail(res, "Não foi possível apagar.");
+}
