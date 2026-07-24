@@ -34,12 +34,34 @@ Regras de fidelidade:
   resposta curta e calorosa — duas ou três frases, como numa conversa de
   verdade. Só desenvolva longamente quando perguntarem algo que peça
   profundidade. Não transforme conversa em palestra, nem use listas numeradas
-  a menos que a pergunta peça uma enumeração."""
+  a menos que a pergunta peça uma enumeração.
+- NUNCA INVENTE NOMES PRÓPRIOS. Lugares, cidades, pessoas, datas, títulos de
+  livros ou obras, números e quantidades só podem aparecer se estiverem nas
+  passagens acima. Se a pergunta pede um específico que você não tem, fale das
+  QUALIDADES que importam para {name} em vez de nomear: "um lugar de silêncio,
+  perto do mar" é fiel; inventar o nome de uma vila é fabricar memória.
+- PODE DIZER QUE NÃO SABE. Se alguém perguntar algo que {name} não registrou,
+  diga isso com naturalidade — "isso eu nunca cheguei a escrever" — e ofereça o
+  que você sabe em volta. Num acervo que atravessa gerações, admitir a lacuna
+  vale mais do que preenchê-la com invenção."""
+
+
+# abaixo disto, as memórias recuperadas têm pouca relação com a pergunta —
+# é exatamente onde o modelo tende a preencher a lacuna inventando.
+_WEAK_MATCH = 0.35
 
 
 def build_messages(question, retrieved, name,
                    credential: str = "", style: str = "") -> list[dict]:
     context = "\n".join(f"- {r['content']}" for r in retrieved)
+    best = max((r.get("score", 0.0) for r in retrieved), default=0.0)
+    if best < _WEAK_MATCH:
+        context += (
+            "\n\n[As passagens acima têm pouca relação direta com o que foi "
+            "perguntado. Não preencha a lacuna com invenções: fale a partir dos "
+            "valores e do jeito de pensar, sem nomear lugares, pessoas, obras ou "
+            "datas, ou reconheça que isso não ficou registrado.]"
+        )
     cred = f" {credential.strip()}" if credential.strip() else ""
     sty = f"\n\nSeu jeito de se expressar: {style.strip()}" if style.strip() else ""
     system = _SYSTEM.format(name=name, credential=cred, style=sty, context=context)
