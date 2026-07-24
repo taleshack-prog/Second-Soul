@@ -114,3 +114,44 @@ async def export_session(job_id: str):
         headers={"Content-Disposition":
                  f'attachment; filename="second-soul-{job_id}.zip"'},
     )
+
+
+# ---------------- recuperação de acesso ----------------
+
+@router.get("/admin/list")
+async def list_sessions(token: str = ""):
+    """Lista as essências existentes — para quem perdeu o link.
+
+    Protegido por token (RECOVERY_TOKEN). Não expõe conteúdo: só o suficiente
+    para a pessoa reconhecer a sua (nome, quantidade, datas). Enquanto não há
+    contas, esta é a única rede de segurança contra perder o acervo.
+    """
+    import os
+
+    expected = os.environ.get("RECOVERY_TOKEN", "")
+    if not expected or token != expected:
+        raise HTTPException(403, "Token inválido.")
+
+    out = []
+    root = sessions.SESSIONS_ROOT
+    if not root.is_dir():
+        return {"sessions": []}
+
+    for d in sorted(root.iterdir(), key=lambda x: -x.stat().st_mtime):
+        if not d.is_dir():
+            continue
+        info = {"job_id": d.name,
+                "modificado": time.strftime("%d/%m %H:%M",
+                                            time.localtime(d.stat().st_mtime))}
+        pf = d / "perfil.json"
+        if pf.exists():
+            try:
+                info["nome"] = json.loads(pf.read_text(encoding="utf-8")).get("name", "")
+            except Exception:
+                pass
+        for fname, key in (("essencia.jsonl", "memorias"),
+                           ("acervo_pecas.jsonl", "pecas")):
+            f = d / fname
+            info[key] = sum(1 for _ in open(f, encoding="utf-8")) if f.exists() else 0
+        out.append(info)
+    return {"sessions": out}

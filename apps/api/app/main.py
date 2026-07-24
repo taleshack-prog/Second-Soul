@@ -36,12 +36,19 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
     lifespan=lifespan,
+    # documentação exposta só quando pedida de propósito (EXPOSE_DOCS=true)
     docs_url="/docs" if os.environ.get("EXPOSE_DOCS") == "true" else None,
     redoc_url=None,
 )
 
 def _allowed_origins() -> list[str]:
-    """Restritivo por padrao: seguranca nao pode depender de variavel."""
+    """Origens autorizadas — restritivo por padrão.
+
+    Antes isto dependia de ENVIRONMENT=prod para deixar de aceitar qualquer
+    origem. Segurança não pode depender de alguém lembrar de configurar uma
+    variável: o padrão é fechado, e só o site declarado (mais o localhost do
+    desenvolvimento) passa.
+    """
     origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
     front = (settings.FRONTEND_URL or "").strip().rstrip("/")
     if front and front not in origins:
@@ -62,6 +69,10 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health")
 async def root_health():
+    """Inclui onde as essências estão gravadas.
+
+    Persistência silenciosamente quebrada (dados fora do volume) apagava tudo
+    a cada redeploy. Agora dá para verificar num olhar: `persistent: true`."""
     from app.core import sessions
 
     root = sessions.SESSIONS_ROOT
