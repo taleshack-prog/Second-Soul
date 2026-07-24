@@ -15,8 +15,21 @@ import os
 from pathlib import Path
 from typing import Any
 
-_DEFAULT = str(Path.cwd() / ".secondsoul_data" / "sessions")
-SESSIONS_ROOT = Path(os.environ.get("SESSIONS_DIR", _DEFAULT))
+def _default_root() -> str:
+    """SESSIONS_DIR -> volume em /data -> pasta local.
+
+    Persistencia nao pode depender de lembrar de uma variavel: se ha volume
+    montado, ele e o lugar certo."""
+    explicit = os.environ.get("SESSIONS_DIR")
+    if explicit:
+        return explicit
+    volume = Path("/data")
+    if volume.is_dir() and os.access(volume, os.W_OK):
+        return str(volume / "sessions")
+    return str(Path.cwd() / ".secondsoul_data" / "sessions")
+
+
+SESSIONS_ROOT = Path(_default_root())
 
 
 def session_dir(job_id: str, create: bool = False) -> Path:

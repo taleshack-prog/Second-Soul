@@ -52,4 +52,14 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health")
 async def root_health():
-    return {"status": "ok", "version": settings.VERSION, "env": settings.ENVIRONMENT}
+    from app.core import sessions
+
+    root = sessions.SESSIONS_ROOT
+    return {
+        "status": "ok",
+        "version": settings.VERSION,
+        "env": settings.ENVIRONMENT,
+        "storage": str(root),
+        "persistent": str(root).startswith("/data"),
+        "sessions": sum(1 for _ in root.glob("*")) if root.is_dir() else 0,
+    }
