@@ -27,6 +27,7 @@ import {
   fetchPieces,
   type Piece,
   newSession,
+  pieceImageUrl,
 } from "@/lib/api";
 
 type Step = number;
@@ -48,6 +49,7 @@ const STEPS = [
 
 // passos do fluxo principal
 const PERFIL = 1, ACERVO = 2, CONVERSA = 3;
+const ALBUM = 4;
 // sub-fluxo opcional: importar conversas de IA
 const IMP_ENVIAR = 10, IMP_CONFERIR = 11, IMP_VOZES = 12;
 
@@ -186,13 +188,19 @@ export default function OnboardingWizard({
         {step === ACERVO && jobId && (
           <StepMemories jobId={jobId} personName={personName}
             onImport={() => setStep(IMP_ENVIAR)}
-            onDone={() => setStep(CONVERSA)} />
+            onDone={() => setStep(CONVERSA)}
+            onAlbum={() => setStep(ALBUM)} />
         )}
 
         {step === CONVERSA && (
           <StepDone personName={personName} jobId={jobId}
             onEditProfile={() => setStep(PERFIL)}
             onAddMemories={() => setStep(ACERVO)} />
+        )}
+
+        {step === ALBUM && jobId && (
+          <StepAlbum jobId={jobId} personName={personName}
+            onBack={() => setStep(ACERVO)} />
         )}
 
         {step === IMP_ENVIAR && (
@@ -858,11 +866,13 @@ function StepMemories({
   personName,
   onImport,
   onDone,
+  onAlbum,
 }: {
   jobId: string;
   personName: string;
   onImport: () => void;
   onDone: () => void;
+  onAlbum: () => void;
 }) {
   const [mode, setMode] = useState<"escrever" | "arquivo">("escrever");
   const [title, setTitle] = useState("");
@@ -1002,6 +1012,9 @@ function StepMemories({
         <button onClick={onDone} className="text-sm text-muted hover:text-ink">
           Conversar com a essência
         </button>
+        <button onClick={onAlbum} className="text-sm text-muted hover:text-ink">
+          Ver o álbum
+        </button>
       </div>
 
       {pieces.length > 0 && (
@@ -1026,6 +1039,123 @@ function StepMemories({
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Álbum: o museu da pessoa ---------------- */
+
+function StepAlbum({
+  jobId,
+  personName,
+  onBack,
+}: {
+  jobId: string;
+  personName: string;
+  onBack: () => void;
+}) {
+  const [pieces, setPieces] = useState<Piece[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<Piece | null>(null);
+
+  useEffect(() => {
+    fetchPieces(jobId)
+      .then(setPieces)
+      .finally(() => setLoading(false));
+  }, [jobId]);
+
+  const images = pieces.filter((p) => p.kind === "imagem");
+  const others = pieces.filter((p) => p.kind !== "imagem");
+
+  return (
+    <div>
+      <Eyebrow>O álbum</Eyebrow>
+      <h1 className="mt-3 font-display text-4xl leading-[1.1] text-ink">
+        O acervo de {personName || "você"}.
+      </h1>
+      <p className="mt-5 text-[17px] leading-relaxed text-muted">
+        O que ficou guardado — e as palavras de quem guardou. É isto que seus
+        descendentes vão ver.
+      </p>
+
+      {loading && <p className="mt-8 text-sm text-muted">Abrindo o álbum…</p>}
+
+      {!loading && pieces.length === 0 && (
+        <p className="mt-8 rounded-2xl border border-line bg-surface p-6 text-muted">
+          O álbum ainda está vazio. Volte ao acervo para guardar uma imagem, uma
+          crônica ou uma gravação.
+        </p>
+      )}
+
+      {images.length > 0 && (
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {images.map((p) => (
+            <button key={p.id} onClick={() => setOpen(p)}
+              className="group overflow-hidden rounded-2xl border border-line bg-surface text-left transition-colors hover:border-soul/50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pieceImageUrl(jobId, p.id)} alt={p.title}
+                className="aspect-square w-full object-cover" />
+              <p className="px-3 py-2 text-sm text-ink">{p.title}</p>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {others.length > 0 && (
+        <div className="mt-10">
+          <p className="text-sm text-muted">Escritos e gravações</p>
+          <div className="mt-3 space-y-2">
+            {others.map((p) => (
+              <div key={p.id} className="rounded-xl border border-line bg-surface p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase tracking-wide text-soul">
+                    {p.kind}
+                  </span>
+                  <span className="text-ink">{p.title}</span>
+                </div>
+                {p.narration && (
+                  <p className="mt-1 text-sm leading-relaxed text-muted">
+                    {p.narration.slice(0, 200)}
+                    {p.narration.length > 200 && "…"}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button onClick={onBack}
+        className="mt-10 text-sm text-muted hover:text-ink">
+        Voltar ao acervo
+      </button>
+
+      {open && (
+        <div onClick={() => setOpen(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          role="dialog" aria-modal="true">
+          <div onClick={(e) => e.stopPropagation()}
+            className="max-h-full w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface p-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={pieceImageUrl(jobId, open.id)} alt={open.title}
+              className="w-full rounded-xl" />
+            <h2 className="mt-4 font-display text-2xl text-ink">{open.title}</h2>
+            {open.narration ? (
+              <p className="mt-2 text-[15px] leading-relaxed text-ink/85">
+                {open.narration}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted">
+                Esta peça ainda não tem as suas palavras.
+              </p>
+            )}
+            <button onClick={() => setOpen(null)}
+              className="mt-5 rounded-full border border-line px-4 py-1.5 text-sm text-muted hover:text-ink">
+              Fechar
+            </button>
           </div>
         </div>
       )}

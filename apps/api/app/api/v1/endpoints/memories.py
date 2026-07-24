@@ -21,6 +21,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from app.core import sessions
@@ -225,6 +226,19 @@ async def _transcribe(data: bytes, filename: str) -> str:
 
 
 # ---------------- listar o acervo ----------------
+
+@router.get("/{job_id}/piece/{piece_id}")
+async def get_piece_file(job_id: str, piece_id: str):
+    """Serve a imagem de uma peça — é o que o álbum exibe."""
+    d = _dir(job_id)
+    pecas = d / "pecas"
+    if not pecas.is_dir():
+        raise HTTPException(404, "Peça não encontrada.")
+    for f in pecas.iterdir():
+        if f.stem == piece_id:
+            return FileResponse(f)
+    raise HTTPException(404, "Peça não encontrada.")
+
 
 @router.get("/{job_id}")
 async def list_memories(job_id: str):

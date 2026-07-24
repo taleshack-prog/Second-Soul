@@ -332,6 +332,10 @@ export async function addFileMemory(
   return res.json();
 }
 
+export function pieceImageUrl(jobId: string, pieceId: string): string {
+  return `${API}/api/v1/memories/${jobId}/piece/${pieceId}`;
+}
+
 export async function fetchPieces(jobId: string): Promise<Piece[]> {
   const res = await fetch(`${API}/api/v1/memories/${jobId}`);
   if (!res.ok) return [];
