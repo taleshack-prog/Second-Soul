@@ -50,6 +50,23 @@ async def ready(job_id: str):
     if not memories:
         ess = d / "essencia.jsonl"
         memories = sum(1 for _ in open(ess, encoding="utf-8")) if ess.exists() else 0
+
+    # Se o índice foi construído em TF-IDF mas o SBERT agora está disponível,
+    # ele está defasado (lê por letra, não por sentido). Reconstrói uma vez,
+    # em segundo plano, para o gêmeo recuperar por significado sem que a pessoa
+    # precise refazer nada.
+    if st.get("backend") == "tfidf":
+        try:
+            import sentence_transformers  # noqa: F401
+            from app.api.v1.endpoints.voices import _build_index
+            import asyncio
+            marker.write_text(json.dumps({"status": "building"}), encoding="utf-8")
+            asyncio.get_event_loop().run_in_executor(None, _build_index, job_id)
+            _INDEX_CACHE.pop(job_id, None)
+            return {"status": "building", "person": person, "memories": memories}
+        except ModuleNotFoundError:
+            pass
+
     return {**st, "person": person, "memories": memories}
 
 
