@@ -45,6 +45,36 @@ async def get_session(job_id: str):
     return st
 
 
+# ---------------- e-mail de recuperação ----------------
+
+class RecoveryEmail(BaseModel):
+    email: str
+
+
+@router.post("/{job_id}/email")
+async def set_recovery_email(job_id: str, body: RecoveryEmail):
+    """Guarda um e-mail junto ao acervo — a rede de segurança contra perder o
+    link. Não enviamos nada: serve para reencontrar o acervo se a pessoa pedir.
+    """
+    email = body.email.strip().lower()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(422, "E-mail inválido.")
+    d = sessions.session_dir(job_id, create=True)
+    (d / "contato.json").write_text(
+        json.dumps({"email": email, "at": time.time()}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return {"saved": True}
+
+
+@router.get("/{job_id}/email")
+async def get_recovery_email(job_id: str):
+    f = sessions.session_dir(job_id) / "contato.json"
+    if not f.exists():
+        return {"email": ""}
+    return {"email": json.loads(f.read_text(encoding="utf-8")).get("email", "")}
+
+
 # ---------------- consentimento ----------------
 
 class Consent(BaseModel):
@@ -141,12 +171,19 @@ async def list_sessions(token: str = ""):
         if not d.is_dir():
             continue
         info = {"job_id": d.name,
+                "link": f"/s/{d.name}",
                 "modificado": time.strftime("%d/%m %H:%M",
                                             time.localtime(d.stat().st_mtime))}
         pf = d / "perfil.json"
         if pf.exists():
             try:
                 info["nome"] = json.loads(pf.read_text(encoding="utf-8")).get("name", "")
+            except Exception:
+                pass
+        cf = d / "contato.json"
+        if cf.exists():
+            try:
+                info["email"] = json.loads(cf.read_text(encoding="utf-8")).get("email", "")
             except Exception:
                 pass
         for fname, key in (("essencia.jsonl", "memorias"),

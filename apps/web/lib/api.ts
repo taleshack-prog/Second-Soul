@@ -374,3 +374,27 @@ export async function deleteSession(jobId: string): Promise<void> {
   );
   if (!res.ok) await fail(res, "Não foi possível apagar.");
 }
+
+/* ---------- e-mail de recuperação ---------- */
+
+export async function setRecoveryEmail(
+  jobId: string,
+  email: string
+): Promise<void> {
+  const res = await fetch(`${API}/api/v1/session/${jobId}/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível guardar o e-mail.");
+}
+
+export async function getRecoveryEmail(jobId: string): Promise<string> {
+  try {
+    const res = await fetch(`${API}/api/v1/session/${jobId}/email`);
+    if (!res.ok) return "";
+    return (await res.json()).email || "";
+  } catch {
+    return "";
+  }
+}

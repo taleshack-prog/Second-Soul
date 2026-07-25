@@ -30,6 +30,8 @@ import {
   pieceImageUrl,
   getConsent,
   acceptConsent,
+  setRecoveryEmail,
+  getRecoveryEmail,
   exportUrl,
   deleteSession,
 } from "@/lib/api";
@@ -102,6 +104,8 @@ export default function OnboardingWizard({
         setJobId(st.job_id);
         if (st.person_name) setPersonName(st.person_name);
         const ok = await getConsent(st.job_id);
+        // só passos que a interface sabe desenhar — um número fora da lista
+        // deixava a tela em branco, sem erro nenhum.
         const known = [PERFIL, ACERVO, CONVERSA];
         const target = known.includes(st.step) ? st.step : ACERVO;
         setStep(ok ? target : CONSENTIMENTO);
@@ -633,10 +637,15 @@ function StepProfile({ jobId, personName, setPersonName, onSaved }: {
   const [error, setError] = useState<string | null>(null);
 
   const [loaded, setLoaded] = useState(false);
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     fetchProfileFields().then(setFields).catch(() => setFields([]));
   }, []);
+
+  useEffect(() => {
+    getRecoveryEmail(jobId).then((e) => e && setEmail(e));
+  }, [jobId]);
 
   // carrega o que já foi declarado — o formulário abria em branco mesmo
   // com o perfil salvo, o que parecia perda de dados.
@@ -655,6 +664,9 @@ function StepProfile({ jobId, personName, setPersonName, onSaved }: {
     setError(null);
     try {
       await saveProfile(jobId, personName.trim(), values);
+      if (email.trim()) {
+        try { await setRecoveryEmail(jobId, email.trim()); } catch { /* não bloqueia */ }
+      }
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível salvar.");
@@ -687,6 +699,16 @@ function StepProfile({ jobId, personName, setPersonName, onSaved }: {
         <input value={personName} onChange={(e) => setPersonName(e.target.value)}
           placeholder="Como quer ser chamada nesta essência"
           className="mt-2 w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink placeholder:text-muted/60 focus:border-soul focus:outline-none" />
+      </div>
+
+      <div className="mt-5">
+        <label className="text-ink">E-mail <span className="text-muted">(para reencontrar seu acervo)</span></label>
+        <input value={email} onChange={(e) => setEmail(e.target.value)}
+          type="email" placeholder="seu@email.com"
+          className="mt-2 w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink placeholder:text-muted/60 focus:border-soul focus:outline-none" />
+        <p className="mt-1.5 text-xs text-muted">
+          Não enviamos nada. Fica guardado só para o caso de você perder o link.
+        </p>
       </div>
 
       <div className="mt-8 space-y-6">
