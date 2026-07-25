@@ -106,12 +106,35 @@ async def talk(body: TalkIn):
                               credential=p.get("credential", ""),
                               style=p.get("style", ""))
     client = AsyncGroq(api_key=settings.GROQ_API_KEY)
-    resp = await client.chat.completions.create(
-        model=settings.GROQ_MODEL, messages=messages,
-        temperature=0.7, max_tokens=1024,
-    )
-    return {
-        "message": resp.choices[0].message.content or "",
-        "grounded_on": len(hits),
-        "model": settings.GROQ_MODEL,
-    }
+
+    # a geração pode falhar por rate limit ou instabilidade do provedor.
+    # sem tratamento, isso virava HTTP 500 -> "NetworkError" no navegador,
+    # sem pista do que aconteceu. Aqui tentamos de novo uma vez e, se ainda
+    # falhar, devolvemos uma mensagem clara em vez de derrubar a conversa.
+    import asyncio
+
+    last_error = ""
+    for attempt in range(2):
+        try:
+            resp = await client.chat.completions.create(
+                model=settings.GROQ_MODEL, messages=messages,
+                temperature=0.7, max_tokens=1024,
+            )
+            return {
+                "message": resp.choices[0].message.content or "",
+                "grounded_on": len(hits),
+                "model": settings.GROQ_MODEL,
+            }
+        except Exception as exc:  # noqa: BLE001
+            last_error = str(exc)
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status == 429 and attempt == 0:
+                await asyncio.sleep(2.0)  # rate limit: espera e tenta de novo
+                continue
+            break
+
+    detail = ("Muitas perguntas em pouco tempo — espere alguns segundos e "
+              "tente de novo." if "429" in last_error or "rate" in last_error.lower()
+              else "A essência não conseguiu responder agora. Tente de novo em "
+                   "instantes.")
+    raise HTTPException(503, detail)
