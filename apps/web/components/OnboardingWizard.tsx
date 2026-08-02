@@ -48,9 +48,10 @@ const PII_OPTIONS = [
 ];
 
 const STEPS = [
-  { n: "01", title: "Quem é você" },
-  { n: "02", title: "O seu acervo" },
-  { n: "03", title: "Conversar" },
+  { n: "01", title: "Quem é você", go: 1 },
+  { n: "02", title: "O seu acervo", go: 2 },
+  { n: "03", title: "Álbum", go: 4 },
+  { n: "04", title: "Conversar", go: 3 },
 ];
 
 // passos do fluxo principal
@@ -67,6 +68,7 @@ export default function OnboardingWizard({
 } = {}) {
   const [step, setStep] = useState<Step>(0);
   const [resumeError, setResumeError] = useState<string | null>(null);
+  const profileSaveRef = useRef<null | (() => Promise<void>)>(null);
   const [prep, setPrep] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pii, setPii] = useState("strict");
@@ -162,19 +164,31 @@ export default function OnboardingWizard({
           </span>
         </div>
         <ol className="space-y-4">
-          {STEPS.map((s, i) => {
-            const main = step >= 10 ? ACERVO : step;
-            const target = i + 1; // 1=perfil, 2=acervo, 3=conversa
-            const active = main === target;
-            const done = main > target;
-            // navegavel so para passos ja alcancados e com sessao pronta
-            const reachable = !!jobId && step > 0 && step < 10 && target <= main;
-            const go = () => reachable && setStep(target as Step);
+          {STEPS.map((s) => {
+            // passo atual normalizado (sub-fluxo de import conta como acervo)
+            const cur = step >= 10 ? ACERVO : step;
+            const active = cur === s.go;
+            // ja alcancado? perfil sempre; os demais dependem de ter avancado.
+            // album e conversa exigem que exista perfil/acervo (step >= 2).
+            const reachable =
+              !!jobId && step > 0 && step < 10 &&
+              (s.go === PERFIL || cur >= ACERVO);
+            const done = reachable && !active;
+
+            const navigate = async () => {
+              if (!reachable || active) return;
+              // auto-save: se estou saindo do perfil, salvo antes de trocar
+              if (cur === PERFIL && profileSaveRef.current) {
+                try { await profileSaveRef.current(); } catch { /* nao bloqueia a navegacao */ }
+              }
+              setStep(s.go as Step);
+            };
+
             return (
               <li key={s.n}>
                 <button
                   type="button"
-                  onClick={go}
+                  onClick={navigate}
                   disabled={!reachable}
                   aria-current={active ? "step" : undefined}
                   className={`flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${
@@ -213,7 +227,7 @@ export default function OnboardingWizard({
         )}
 
         {step === PERFIL && jobId && (
-          <StepProfile jobId={jobId} personName={personName}
+          <StepProfile saveRef={profileSaveRef} jobId={jobId} personName={personName}
             setPersonName={setPersonName}
             onSaved={() => setStep(ACERVO)} />
         )}
@@ -641,9 +655,10 @@ function StepVoices({ jobId, personName, setPersonName, onSaved }: {
 
 /* ---------------- Passo 5: perfil ---------------- */
 
-function StepProfile({ jobId, personName, setPersonName, onSaved }: {
+function StepProfile({ jobId, personName, setPersonName, onSaved, saveRef }: {
   jobId: string; personName: string;
   setPersonName: (s: string) => void; onSaved: () => void;
+  saveRef?: React.MutableRefObject<null | (() => Promise<void>)>;
 }) {
   const [fields, setFields] = useState<ProfileField[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -673,14 +688,24 @@ function StepProfile({ jobId, personName, setPersonName, onSaved }: {
 
   const filled = Object.values(values).filter((v) => v.trim()).length;
 
+  // salva sem navegar — usado pelo auto-save ao trocar de passo na barra
+  const persist = async () => {
+    await saveProfile(jobId, personName.trim(), values);
+    if (email.trim()) {
+      try { await setRecoveryEmail(jobId, email.trim()); } catch { /* não bloqueia */ }
+    }
+  };
+
+  useEffect(() => {
+    if (saveRef) saveRef.current = persist;
+    return () => { if (saveRef) saveRef.current = null; };
+  });
+
   async function handleSave() {
     setBusy(true);
     setError(null);
     try {
-      await saveProfile(jobId, personName.trim(), values);
-      if (email.trim()) {
-        try { await setRecoveryEmail(jobId, email.trim()); } catch { /* não bloqueia */ }
-      }
+      await persist();
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível salvar.");
