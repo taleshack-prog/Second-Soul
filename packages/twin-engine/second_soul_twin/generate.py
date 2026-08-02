@@ -36,10 +36,17 @@ Regras de fidelidade:
   profundidade. Não transforme conversa em palestra, nem use listas numeradas
   a menos que a pergunta peça uma enumeração.
 - NUNCA INVENTE NOMES PRÓPRIOS. Lugares, cidades, pessoas, datas, títulos de
-  livros ou obras, números e quantidades só podem aparecer se estiverem nas
-  passagens acima. Se a pergunta pede um específico que você não tem, fale das
-  QUALIDADES que importam para {name} em vez de nomear: "um lugar de silêncio,
+  livros, MÚSICAS, FILMES ou obras, NOMES DE ARTISTAS OU BANDAS, números e
+  quantidades só podem aparecer se estiverem nas passagens acima. Atribuir uma
+  obra a um autor ("tal música de tal banda") exige que ambos estejam nas
+  passagens — inventar o par é fabricação dupla. Se a pergunta pede um específico
+  que você não tem, fale das QUALIDADES em vez de nomear: "um lugar de silêncio
   perto do mar" é fiel; inventar o nome de uma vila é fabricar memória.
+- NÃO COMPLETE LISTAS POR CONTA PRÓPRIA. Se perguntam "que músicas?" e você só
+  tem uma nas passagens, cite essa uma e pare — não invente a segunda para a
+  resposta parecer completa. Uma resposta curta e verdadeira vale mais que uma
+  lista onde metade é inventada. É melhor dizer "essa é a que me vem agora" do
+  que preencher com nomes que {name} nunca registrou.
 - PODE DIZER QUE NÃO SABE. Se alguém perguntar algo que {name} não registrou,
   diga isso com naturalidade — "isso eu nunca cheguei a escrever" — e ofereça o
   que você sabe em volta. Num acervo que atravessa gerações, admitir a lacuna
@@ -61,6 +68,20 @@ def build_messages(question, retrieved, name,
             "perguntado. Não preencha a lacuna com invenções: fale a partir dos "
             "valores e do jeito de pensar, sem nomear lugares, pessoas, obras ou "
             "datas, ou reconheça que isso não ficou registrado.]"
+        )
+
+    # perguntas que pedem lista ("quais", "que músicas", "onde já") sao onde o
+    # modelo estica a verdade para encher a enumeracao — o caso "La Bamba".
+    q_low = question.lower()
+    pede_lista = any(t in q_low for t in (
+        "quais", "que músicas", "que musicas", "que livros", "que autores",
+        "que bandas", "que filmes", "onde já", "onde ja", "lista", "cite"))
+    if pede_lista:
+        context += (
+            "\n\n[A pergunta pede vários itens. Cite APENAS os que aparecem nas "
+            "passagens, ainda que seja um só. NÃO complete a lista com nomes, "
+            "títulos ou artistas que não estejam acima — melhor um item verdadeiro "
+            "que três, com dois inventados.]"
         )
     cred = f" {credential.strip()}" if credential.strip() else ""
     sty = f"\n\nSeu jeito de se expressar: {style.strip()}" if style.strip() else ""
