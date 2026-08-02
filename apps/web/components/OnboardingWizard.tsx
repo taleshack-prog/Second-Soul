@@ -164,16 +164,30 @@ export default function OnboardingWizard({
         <ol className="space-y-4">
           {STEPS.map((s, i) => {
             const main = step >= 10 ? ACERVO : step;
-            const active = main === i + 1;
-            const done = main > i + 1;
+            const target = i + 1; // 1=perfil, 2=acervo, 3=conversa
+            const active = main === target;
+            const done = main > target;
+            // navegavel so para passos ja alcancados e com sessao pronta
+            const reachable = !!jobId && step > 0 && step < 10 && target <= main;
+            const go = () => reachable && setStep(target as Step);
             return (
-              <li key={s.n} className="flex items-start gap-3">
-                <span className={`mt-0.5 font-display text-sm ${
-                  active ? "text-soul" : done ? "text-muted" : "text-line"
-                }`}>{s.n}</span>
-                <span className={`text-sm leading-tight ${
-                  active ? "text-ink" : "text-muted"
-                }`}>{s.title}</span>
+              <li key={s.n}>
+                <button
+                  type="button"
+                  onClick={go}
+                  disabled={!reachable}
+                  aria-current={active ? "step" : undefined}
+                  className={`flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                    reachable ? "cursor-pointer hover:bg-surface" : "cursor-default"
+                  }`}
+                >
+                  <span className={`mt-0.5 font-display text-sm ${
+                    active ? "text-soul" : done ? "text-muted" : "text-line"
+                  }`}>{s.n}</span>
+                  <span className={`text-sm leading-tight ${
+                    active ? "text-ink" : done ? "text-muted" : "text-line"
+                  }`}>{s.title}</span>
+                </button>
               </li>
             );
           })}
