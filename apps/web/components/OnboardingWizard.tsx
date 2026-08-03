@@ -69,6 +69,12 @@ export default function OnboardingWizard({
   const [step, setStep] = useState<Step>(0);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const profileSaveRef = useRef<null | (() => Promise<void>)>(null);
+  const [maxReached, setMaxReached] = useState(1);
+
+  useEffect(() => {
+    const norm = step >= 10 ? ACERVO : step;
+    if (norm >= 1 && norm <= 4) setMaxReached((m) => Math.max(m, norm));
+  }, [step]);
   const [prep, setPrep] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pii, setPii] = useState("strict");
@@ -172,7 +178,7 @@ export default function OnboardingWizard({
             // album e conversa exigem que exista perfil/acervo (step >= 2).
             const reachable =
               !!jobId && step > 0 && step < 10 &&
-              (s.go === PERFIL || cur >= ACERVO);
+              s.go <= maxReached;
             const done = reachable && !active;
 
             const navigate = async () => {
