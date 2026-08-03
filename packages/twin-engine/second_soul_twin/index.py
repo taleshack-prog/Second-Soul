@@ -28,7 +28,7 @@ class TwinIndex:
         self.backend = backend
         self.meta: list[dict[str, Any]] = []
         self.weights: np.ndarray | None = None    # peso de recuperação por item
-        self.profile: dict[str, str] = {}         # {credential, style}
+        self.profile: dict = {}                   # {credential, style, album:[titulos]}
         self._emb: np.ndarray | None = None      # sbert
         self._vectorizer = None                   # tfidf
         self._matrix = None                       # tfidf

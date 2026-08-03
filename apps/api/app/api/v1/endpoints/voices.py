@@ -162,6 +162,22 @@ def _build_index(job_id: str) -> None:
             rows = prof.profile_to_items(p) + rows
             summary = prof.summaries(p)
 
+        # consciência do álbum: o gêmeo precisa SABER que possui imagens
+        # legendadas, senão inventa ("não tenho álbum") quando perguntado
+        # sobre elas. Lista os títulos das peças de imagem para o prompt.
+        pecas_file = d / "acervo_pecas.jsonl"
+        if pecas_file.exists():
+            titulos = []
+            with open(pecas_file, encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    pc = json.loads(line)
+                    if pc.get("kind") == "imagem" and pc.get("title"):
+                        titulos.append(pc["title"])
+            if titulos:
+                summary["album"] = titulos
+
         # SBERT é o backend do gêmeo (recupera por significado). Se o pacote
         # não estiver disponível, degrada pra TF-IDF com aviso — melhor um
         # gêmeo funcional mais fraco do que nenhum.

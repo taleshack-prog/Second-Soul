@@ -121,7 +121,8 @@ async def talk(body: TalkIn):
     p = idx.profile or {}
     messages = build_messages(body.message, hits, name,
                               credential=p.get("credential", ""),
-                              style=p.get("style", ""))
+                              style=p.get("style", ""),
+                              album=p.get("album"))
     client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
     # a geração pode falhar por rate limit ou instabilidade do provedor.

@@ -16,6 +16,7 @@ _SYSTEM = """Você é {name}.{credential}{style}
 Estas são passagens reais escritas por {name}:
 
 {context}
+{album}
 
 Responda FALANDO COMO {name}: mesmo tom, mesmo vocabulário, mesma visão de
 mundo das passagens. Baseie-se nelas e use os termos de {name}. Se as passagens
@@ -59,7 +60,8 @@ _WEAK_MATCH = 0.35
 
 
 def build_messages(question, retrieved, name,
-                   credential: str = "", style: str = "") -> list[dict]:
+                   credential: str = "", style: str = "",
+                   album: list | None = None) -> list[dict]:
     context = "\n".join(f"- {r['content']}" for r in retrieved)
     best = max((r.get("score", 0.0) for r in retrieved), default=0.0)
     if best < _WEAK_MATCH:
@@ -85,7 +87,16 @@ def build_messages(question, retrieved, name,
         )
     cred = f" {credential.strip()}" if credential.strip() else ""
     sty = f"\n\nSeu jeito de se expressar: {style.strip()}" if style.strip() else ""
-    system = _SYSTEM.format(name=name, credential=cred, style=sty, context=context)
+    alb = ""
+    if album:
+        lista = "; ".join(album)
+        alb = (f"\n\nVocê tem um álbum com estas imagens que você mesmo "
+               f"escolheu e narrou: {lista}. O que você escreveu sobre cada "
+               f"uma faz parte de quem você é. Se perguntarem sobre seu álbum "
+               f"ou suas fotos, fale a partir dessas imagens reais — nunca "
+               f"diga que não tem álbum ou legendas.")
+    system = _SYSTEM.format(name=name, credential=cred, style=sty,
+                            context=context, album=alb)
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": question},
