@@ -696,10 +696,10 @@ function StepProfile({ jobId, personName, setPersonName, onSaved, saveRef }: {
     }
   };
 
-  useEffect(() => {
-    if (saveRef) saveRef.current = persist;
-    return () => { if (saveRef) saveRef.current = null; };
-  });
+  // registra a versao ATUAL do persist a cada render (sem janela nula):
+  // o useEffect com cleanup deixava o ref momentaneamente vazio e a barra
+  // encontrava null ao tentar o auto-save.
+  if (saveRef) saveRef.current = persist;
 
   async function handleSave() {
     setBusy(true);
