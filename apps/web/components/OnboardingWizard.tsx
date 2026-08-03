@@ -178,7 +178,9 @@ export default function OnboardingWizard({
             // album e conversa exigem que exista perfil/acervo (step >= 2).
             const reachable =
               !!jobId && step > 0 && step < 10 &&
-              s.go <= maxReached;
+              // o Album (go=4) e a Conversa (go=3) sao vitrines, nao etapas
+              // sequenciais: liberam assim que existe acervo (maxReached>=2).
+              (s.go <= maxReached || (s.go >= 3 && maxReached >= 2));
             const done = reachable && !active;
 
             const navigate = async () => {
