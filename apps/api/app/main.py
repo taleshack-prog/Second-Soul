@@ -20,15 +20,15 @@ from app.core.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.DEBUG:
-        # Em dev, cria tabelas na subida. Em prod: `alembic upgrade head`.
-        try:
-            from app.core.database import Base, engine
-
-            async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
-        except Exception as exc:  # DB pode não estar de pé em dev local puro
-            print(f"[startup] DB indisponível ({exc}); seguindo sem criar tabelas.")
+    # cria as tabelas de conta/acesso na subida (idempotente). Não derruba a
+    # API se o banco estiver fora — o resto do produto (acervos em arquivo)
+    # segue funcionando; só os endpoints de conta ficam indisponíveis.
+    try:
+        from app.core.database import init_models
+        await init_models()
+        print("[startup] tabelas de conta prontas.")
+    except Exception as exc:
+        print(f"[startup] DB indisponível ({exc}); contas offline, resto segue.")
     yield
 
 
