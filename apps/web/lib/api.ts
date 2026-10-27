@@ -398,3 +398,155 @@ export async function getRecoveryEmail(jobId: string): Promise<string> {
     return "";
   }
 }
+
+/* ======================================================================
+   CONTAS E ACESSO (etapa 2) — token guardado no navegador + chamadas
+   autenticadas. O token é um JWT; viaja no header Authorization.
+   ====================================================================== */
+
+const TOKEN_KEY = "ss_token";
+
+export function getToken(): string {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    /* modo privado / storage bloqueado: segue sem persistir */
+  }
+}
+
+export function clearToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignora */
+  }
+}
+
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const t = getToken();
+  return t ? { ...extra, Authorization: `Bearer ${t}` } : extra;
+}
+
+export type Account = {
+  account_id: string;
+  email: string;
+  name: string;
+  is_admin: boolean;
+};
+
+export type TokenResponse = Account & { token: string };
+
+export type MyArchive = {
+  job_id: string;
+  role: string;
+  status: string;
+  can_reinvite: boolean;
+  person_name: string;
+  twin_ready: boolean;
+};
+
+export type AdminLink = {
+  account_id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  can_reinvite: boolean;
+};
+
+export type AdminArchive = {
+  job_id: string;
+  person_name: string;
+  step: number;
+  twin_ready: boolean;
+  owner_email: string;
+  links: AdminLink[];
+};
+
+export async function register(
+  email: string,
+  password: string,
+  name: string
+): Promise<TokenResponse> {
+  const res = await fetch(`${API}/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível criar a conta.");
+  const data = (await res.json()) as TokenResponse;
+  setToken(data.token);
+  return data;
+}
+
+export async function login(email: string, password: string): Promise<TokenResponse> {
+  const res = await fetch(`${API}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) await fail(res, "E-mail ou senha incorretos.");
+  const data = (await res.json()) as TokenResponse;
+  setToken(data.token);
+  return data;
+}
+
+/** Quem é o portador do token? null se não estiver logado / token inválido. */
+export async function me(): Promise<Account | null> {
+  if (!getToken()) return null;
+  try {
+    const res = await fetch(`${API}/api/v1/auth/me`, { headers: authHeaders() });
+    if (!res.ok) {
+      if (res.status === 401) clearToken();
+      return null;
+    }
+    return (await res.json()) as Account;
+  } catch {
+    return null;
+  }
+}
+
+export async function myArchives(): Promise<MyArchive[]> {
+  const res = await fetch(`${API}/api/v1/auth/me/archives`, { headers: authHeaders() });
+  if (!res.ok) await fail(res, "Não foi possível carregar seus acervos.");
+  return (await res.json()) as MyArchive[];
+}
+
+/* ---------- admin ---------- */
+
+export async function adminArchives(): Promise<AdminArchive[]> {
+  const res = await fetch(`${API}/api/v1/admin/archives`, { headers: authHeaders() });
+  if (!res.ok) await fail(res, "Não foi possível carregar os acervos.");
+  return (await res.json()) as AdminArchive[];
+}
+
+export async function adminAssign(
+  jobId: string,
+  email: string,
+  role = "owner"
+): Promise<AdminLink> {
+  const res = await fetch(`${API}/api/v1/admin/link`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ job_id: jobId, email, role }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível atribuir o dono.");
+  return (await res.json()) as AdminLink;
+}
+
+export async function adminUnlink(jobId: string, email: string): Promise<void> {
+  const res = await fetch(`${API}/api/v1/admin/link`, {
+    method: "DELETE",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ job_id: jobId, email }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível remover o vínculo.");
+}
