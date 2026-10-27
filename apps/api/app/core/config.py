@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 dias: produto de uso espaçado, não app de banco
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
+    # e-mails com poder de admin (painel de vínculos e liberação pós-morte),
+    # separados por vírgula. Vazio por padrão: defina ADMIN_EMAILS no ambiente.
+    ADMIN_EMAILS: str = ""
 
     # AWS
     AWS_REGION: str = "us-east-1"
