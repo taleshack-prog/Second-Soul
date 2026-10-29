@@ -29,6 +29,7 @@ import {
   getMemoryItem,
   editMemory,
   deleteMemory,
+  type Genre,
   newSession,
   pieceImageUrl,
   getConsent,
@@ -967,6 +968,7 @@ function StepMemories({
   const [mode, setMode] = useState<"escrever" | "arquivo">("escrever");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [genre, setGenre] = useState<Genre>("vivido");
   const [file, setFile] = useState<File | null>(null);
   const [narration, setNarration] = useState("");
   const [busy, setBusy] = useState(false);
@@ -985,13 +987,14 @@ function StepMemories({
     setMsg(null);
     try {
       if (mode === "escrever") {
-        const r = await addTextMemory(jobId, title, content);
+        const r = await addTextMemory(jobId, title, content, genre);
         setMsg(`Guardado: ${r.title} (${r.words} palavras).`);
         setTitle("");
         setContent("");
+        setGenre("vivido");
       } else {
         if (!file) return;
-        const r = await addFileMemory(jobId, file, title, narration);
+        const r = await addFileMemory(jobId, file, title, narration, genre);
         setMsg(
           r.transcript
             ? `Transcrito e guardado: ${r.title}.`
@@ -1000,6 +1003,7 @@ function StepMemories({
         setFile(null);
         setTitle("");
         setNarration("");
+        setGenre("vivido");
         if (fileRef.current) fileRef.current.value = "";
       }
       setPieces(await fetchPieces(jobId));
@@ -1011,6 +1015,7 @@ function StepMemories({
   }
 
   const isImage = file ? /\.(jpe?g|png|heic|webp|gif|tiff)$/i.test(file.name) : false;
+  const isTextDoc = file ? /\.(txt|md|markdown|rtf|docx?|pdf|odt)$/i.test(file.name) : false;
 
   return (
     <div>
@@ -1052,6 +1057,39 @@ function StepMemories({
         <input value={title} onChange={(e) => setTitle(e.target.value)}
           placeholder="Um título — ex.: O bonsai do meu pai"
           className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-ink placeholder:text-muted/60 focus:border-soul focus:outline-none" />
+
+        {(mode === "escrever" || isImage || isTextDoc) && (
+          <div>
+            <p className="mb-2 text-sm text-muted">Isto é…</p>
+            <div className="flex gap-2">
+              {(
+                [
+                  ["vivido", "uma memória real"],
+                  ["ficcao", "um texto / conto que escrevi"],
+                ] as const
+              ).map(([g, label]) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGenre(g)}
+                  className={`rounded-full border px-4 py-2 text-sm transition-colors ${
+                    genre === g
+                      ? "border-soul bg-soul/15 text-soul"
+                      : "border-line bg-surface text-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {genre === "ficcao" && (
+              <p className="mt-2 text-xs text-muted">
+                O gêmeo vai tratar isto como obra sua — nunca como algo que
+                aconteceu de verdade.
+              </p>
+            )}
+          </div>
+        )}
 
         {mode === "escrever" ? (
           <textarea value={content} onChange={(e) => setContent(e.target.value)}
@@ -1145,6 +1183,7 @@ function PieceCard({
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(piece.title);
   const [content, setContent] = useState<string | null>(null);
+  const [genre, setGenre] = useState<Genre>(piece.genre ?? "vivido");
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1157,6 +1196,7 @@ function PieceCard({
         const item = await getMemoryItem(jobId, piece.id);
         setTitle(item.title);
         setContent(item.content);
+        setGenre(item.genre);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro ao abrir.");
       }
@@ -1168,7 +1208,7 @@ function PieceCard({
     setError(null);
     try {
       // imagem: o conteúdo editável é a narração; texto: o corpo inteiro
-      await editMemory(jobId, piece.id, title, content ?? undefined);
+      await editMemory(jobId, piece.id, title, content ?? undefined, genre);
       setEditing(false);
       onChanged();
     } catch (e) {
@@ -1215,6 +1255,30 @@ function PieceCard({
             className="mt-1 w-full rounded-lg border border-line bg-base px-3 py-2 text-ink leading-relaxed outline-none focus:border-soul"
           />
         )}
+        <label className="mt-3 block text-xs uppercase tracking-wide text-soul">
+          Isto é
+        </label>
+        <div className="mt-1 flex gap-2">
+          {(
+            [
+              ["vivido", "memória real"],
+              ["ficcao", "texto / conto"],
+            ] as const
+          ).map(([g, label]) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGenre(g)}
+              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                genre === g
+                  ? "border-soul bg-soul/15 text-soul"
+                  : "border-line bg-base text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         {error && <p className="mt-2 text-sm text-soul">{error}</p>}
         <div className="mt-3 flex items-center gap-3">
           <button
@@ -1246,6 +1310,11 @@ function PieceCard({
             <span className="text-xs uppercase tracking-wide text-soul">
               {piece.kind}
             </span>
+            {piece.genre === "ficcao" && (
+              <span className="rounded-full border border-soul/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-soul/90">
+                conto
+              </span>
+            )}
             <span className="text-ink">{piece.title}</span>
           </div>
           {piece.narration && (

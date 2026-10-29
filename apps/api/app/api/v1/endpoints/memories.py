@@ -45,12 +45,22 @@ def _dir(job_id: str) -> Path:
     return d
 
 
+# tipos de conteúdo: "vivido" (aconteceu de verdade) vs "ficcao" (texto/conto
+# autoral). O gêmeo usa isso para não tratar uma obra como um acontecimento.
+_GENRES = {"vivido", "ficcao"}
+
+
+def _norm_genre(g: str) -> str:
+    return g if g in _GENRES else "vivido"
+
+
 def _append_essence(job_id: str, content: str, source: str, title: str,
-                    piece_id: str = "") -> None:
+                    piece_id: str = "", genre: str = "vivido") -> None:
     """Acrescenta à essência — é o que o gêmeo passa a conhecer.
 
     piece_id liga esta linha à peça correspondente no acervo, para permitir
     editar e excluir depois (linhas antigas não têm e são casadas por heurística).
+    genre marca se é memória vivida ou texto/conto escrito.
     """
     d = _dir(job_id)
     row = {
@@ -59,6 +69,7 @@ def _append_essence(job_id: str, content: str, source: str, title: str,
         "source": source,
         "file_name": title,
         "piece_id": piece_id,
+        "genre": _norm_genre(genre),
         "added_at": time.time(),
     }
     with open(d / "essencia.jsonl", "a", encoding="utf-8") as fh:
@@ -134,6 +145,7 @@ def _match_essence_idx(ess_rows: list[dict], piece: dict) -> int | None:
 class TextMemory(BaseModel):
     title: str = Field(default="", max_length=200)
     content: str = Field(min_length=10, max_length=100_000)
+    genre: str = Field(default="vivido")  # "vivido" | "ficcao"
 
 
 @router.post("/{job_id}/text")
@@ -141,10 +153,11 @@ async def add_text(job_id: str, body: TextMemory, background: BackgroundTasks):
     """Uma crônica, uma história de família, uma decisão que quis registrar."""
     title = body.title.strip() or "Memória escrita"
     content = body.content.strip()
+    genre = _norm_genre(body.genre)
     piece_id = uuid.uuid4().hex[:10]
-    _append_essence(job_id, content, "escrita", title, piece_id)
+    _append_essence(job_id, content, "escrita", title, piece_id, genre)
     _register_piece(job_id, {
-        "id": piece_id, "kind": "texto", "title": title,
+        "id": piece_id, "kind": "texto", "title": title, "genre": genre,
         "narration": content[:400], "added_at": time.time(),
     })
     _reindex(background, job_id)
@@ -161,11 +174,13 @@ async def add_file(
     file: UploadFile = File(...),
     narration: str = Form(""),
     title: str = Form(""),
+    genre: str = Form("vivido"),
 ):
     d = _dir(job_id)
     name = file.filename or "arquivo"
     ext = Path(name).suffix.lower()
     display = title.strip() or Path(name).stem
+    genre = _norm_genre(genre)
 
     data = await file.read(60 * 1024 * 1024 + 1)
     if len(data) > 60 * 1024 * 1024:
@@ -178,9 +193,9 @@ async def add_file(
         if len(text) < 10:
             raise HTTPException(422, "Não encontramos texto nesse arquivo.")
         piece_id = uuid.uuid4().hex[:10]
-        _append_essence(job_id, text, "arquivo", display, piece_id)
+        _append_essence(job_id, text, "arquivo", display, piece_id, genre)
         _register_piece(job_id, {
-            "id": piece_id, "kind": "texto", "title": display,
+            "id": piece_id, "kind": "texto", "title": display, "genre": genre,
             "narration": text[:400], "added_at": time.time(),
         })
         _reindex(background, job_id)
@@ -204,11 +219,11 @@ async def add_file(
             raise HTTPException(422, "Não conseguimos ouvir fala nesse arquivo.")
 
         piece_id = uuid.uuid4().hex[:10]
-        _append_essence(job_id, text.strip(), "transcricao", display, piece_id)
+        _append_essence(job_id, text.strip(), "transcricao", display, piece_id, genre)
         _register_piece(job_id, {
             "id": piece_id,
             "kind": "audio" if ext in _AUDIO_EXT else "video",
-            "title": display, "narration": text.strip()[:400],
+            "title": display, "genre": genre, "narration": text.strip()[:400],
             "added_at": time.time(),
         })
         _reindex(background, job_id)
@@ -225,10 +240,11 @@ async def add_file(
 
         narr = narration.strip()
         if narr:
-            _append_essence(job_id, f"Sobre {display}: {narr}", "peca", display, piece_id)
+            _append_essence(job_id, f"Sobre {display}: {narr}", "peca", display,
+                            piece_id, genre)
             _reindex(background, job_id)
         _register_piece(job_id, {
-            "id": piece_id, "kind": "imagem", "title": display,
+            "id": piece_id, "kind": "imagem", "title": display, "genre": genre,
             "narration": narr, "file": stored.name, "added_at": time.time(),
         })
         return {"saved": True, "kind": "imagem", "title": display,
@@ -351,6 +367,7 @@ async def get_item(job_id: str, piece_id: str):
         "kind": piece.get("kind", "texto"),
         "title": piece.get("title", ""),
         "content": full,
+        "genre": piece.get("genre", "vivido"),
         "has_image": bool(piece.get("file")),
     }
 
@@ -358,6 +375,7 @@ async def get_item(job_id: str, piece_id: str):
 class EditItem(BaseModel):
     title: str = Field(default="", max_length=200)
     content: str | None = Field(default=None, max_length=100_000)
+    genre: str | None = Field(default=None)  # "vivido" | "ficcao" | None (mantém)
 
 
 @router.patch("/{job_id}/item/{piece_id}")
@@ -371,7 +389,10 @@ async def edit_item(job_id: str, piece_id: str, body: EditItem,
     kind = piece.get("kind", "texto")
 
     new_title = body.title.strip() or piece.get("title", "") or "Memória"
-    # conteúdo: se não veio, mantém o atual (só mudou o título)
+    # tipo: se não veio, mantém o atual
+    new_genre = _norm_genre(body.genre) if body.genre is not None else \
+        piece.get("genre", "vivido")
+    # conteúdo: se não veio, mantém o atual (só mudou o título/tipo)
     keep_content = body.content is None
     new_content = (body.content or "").strip()
 
@@ -390,6 +411,7 @@ async def edit_item(job_id: str, piece_id: str, body: EditItem,
 
     # --- atualiza a peça (o que o álbum mostra) ---
     piece["title"] = new_title
+    piece["genre"] = new_genre
     piece["narration"] = new_content if kind == "imagem" else new_content[:400]
     pieces[idx] = piece
     _write_jsonl(d / "acervo_pecas.jsonl", pieces)
@@ -405,6 +427,7 @@ async def edit_item(job_id: str, piece_id: str, body: EditItem,
             ess[ei]["content"] = ess_content
             ess[ei]["file_name"] = new_title
             ess[ei]["piece_id"] = piece_id
+            ess[ei]["genre"] = new_genre
         else:  # imagem ficou sem narração: a essência não tem o que aprender
             ess.pop(ei)
         _write_jsonl(d / "essencia.jsonl", ess)
@@ -412,7 +435,7 @@ async def edit_item(job_id: str, piece_id: str, body: EditItem,
         # não havia linha (ex.: imagem antes sem narração): cria uma
         _append_essence(job_id, ess_content,
                         "peca" if kind == "imagem" else "escrita",
-                        new_title, piece_id)
+                        new_title, piece_id, new_genre)
 
     _reindex(background, job_id)
     return {"saved": True, "id": piece_id, "title": new_title}

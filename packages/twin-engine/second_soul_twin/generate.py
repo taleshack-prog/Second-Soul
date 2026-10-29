@@ -97,7 +97,14 @@ _WEAK_MATCH = 0.35
 def build_messages(question, retrieved, name,
                    credential: str = "", style: str = "",
                    album: list | None = None) -> list[dict]:
-    context = "\n".join(f"- {r['content']}" for r in retrieved)
+    # rotula cada passagem pelo tipo: o gêmeo precisa saber o que é vida e o
+    # que é obra, senão funde um conto com uma lembrança (caso Casa Pueblo).
+    def _label(r: dict) -> str:
+        if r.get("genre") == "ficcao":
+            return f"- [TEXTO/CONTO que {name} escreveu] {r['content']}"
+        return f"- {r['content']}"
+    context = "\n".join(_label(r) for r in retrieved)
+    tem_ficcao = any(r.get("genre") == "ficcao" for r in retrieved)
     best = max((r.get("score", 0.0) for r in retrieved), default=0.0)
     if best < _WEAK_MATCH:
         context += (
@@ -136,6 +143,15 @@ def build_messages(question, retrieved, name,
             "soltos (profissão, quadros, parentes): diga com naturalidade que não "
             "tem essa história guardada e ofereça uma memória real que você tenha. "
             "Uma cena inventada aqui é o pior erro possível.]"
+        )
+
+    if tem_ficcao:
+        context += (
+            f"\n\n[Atenção: as passagens marcadas [TEXTO/CONTO que {name} escreveu] "
+            f"são OBRAS de ficção/autorais, NÃO acontecimentos vividos. Fale delas "
+            f"como textos que você escreveu ('num conto meu...', 'escrevi sobre...'), "
+            f"nunca como algo que lhe aconteceu de verdade. E jamais funda o que "
+            f"está num conto com uma memória real — são mundos separados.]"
         )
     cred = f" {credential.strip()}" if credential.strip() else ""
     sty = f"\n\nSeu jeito de se expressar: {style.strip()}" if style.strip() else ""

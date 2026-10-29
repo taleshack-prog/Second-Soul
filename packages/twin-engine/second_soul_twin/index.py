@@ -94,6 +94,9 @@ class TwinIndex:
              "content": self.meta[i]["content"],
              "source": self.meta[i].get("source", "chat"),
              "file_name": self.meta[i].get("file_name", ""),
+             # genre: "vivido" (aconteceu) vs "ficcao" (texto/conto escrito).
+             # viaja até o prompt para o gêmeo não tratar obra como vida.
+             "genre": self.meta[i].get("genre", "vivido"),
              "timestamp": self.meta[i].get("timestamp")}
             for i in top
         ]

@@ -308,19 +308,24 @@ export type Piece = {
   kind: "texto" | "imagem" | "audio" | "video";
   title: string;
   narration: string;
+  genre?: "vivido" | "ficcao";
   file?: string;
   added_at: number;
 };
 
+/** genre: "vivido" (aconteceu) ou "ficcao" (texto/conto que escreveu). */
+export type Genre = "vivido" | "ficcao";
+
 export async function addTextMemory(
   jobId: string,
   title: string,
-  content: string
+  content: string,
+  genre: Genre = "vivido"
 ): Promise<{ words: number; title: string }> {
   const res = await fetch(`${API}/api/v1/memories/${jobId}/text`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, content }),
+    body: JSON.stringify({ title, content, genre }),
   });
   if (!res.ok) await fail(res, "Não foi possível guardar essa memória.");
   return res.json();
@@ -330,12 +335,14 @@ export async function addFileMemory(
   jobId: string,
   file: File,
   title: string,
-  narration: string
+  narration: string,
+  genre: Genre = "vivido"
 ): Promise<{ kind: string; title: string; transcript?: string }> {
   const form = new FormData();
   form.append("file", file);
   form.append("title", title);
   form.append("narration", narration);
+  form.append("genre", genre);
   const res = await fetch(`${API}/api/v1/memories/${jobId}/upload`, {
     method: "POST",
     body: form,
@@ -359,6 +366,7 @@ export type MemoryItem = {
   kind: "texto" | "imagem" | "audio" | "video";
   title: string;
   content: string; // texto completo (não o resumo)
+  genre: Genre;
   has_image: boolean;
 };
 
@@ -372,15 +380,17 @@ export async function getMemoryItem(
   return res.json();
 }
 
-/** Corrige título e/ou conteúdo. Deixe content como undefined para mudar só o título. */
+/** Corrige título, conteúdo e/ou tipo. Campos undefined são mantidos. */
 export async function editMemory(
   jobId: string,
   pieceId: string,
   title: string,
-  content?: string
+  content?: string,
+  genre?: Genre
 ): Promise<void> {
-  const body: { title: string; content?: string } = { title };
+  const body: { title: string; content?: string; genre?: Genre } = { title };
   if (content !== undefined) body.content = content;
+  if (genre !== undefined) body.genre = genre;
   const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
