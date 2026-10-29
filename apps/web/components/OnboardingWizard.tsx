@@ -26,6 +26,9 @@ import {
   addFileMemory,
   fetchPieces,
   type Piece,
+  getMemoryItem,
+  editMemory,
+  deleteMemory,
   newSession,
   pieceImageUrl,
   getConsent,
@@ -1107,28 +1110,188 @@ function StepMemories({
       {pieces.length > 0 && (
         <div className="mt-10">
           <p className="text-sm text-muted">
-            {pieces.length} peça{pieces.length > 1 ? "s" : ""} no acervo
+            {pieces.length} peça{pieces.length > 1 ? "s" : ""} no acervo · toque em
+            uma para revisar
           </p>
           <div className="mt-3 space-y-2">
-            {pieces.slice(0, 8).map((p) => (
-              <div key={p.id} className="rounded-xl border border-line bg-surface p-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase tracking-wide text-soul">
-                    {p.kind}
-                  </span>
-                  <span className="text-ink">{p.title}</span>
-                </div>
-                {p.narration && (
-                  <p className="mt-1 text-sm leading-relaxed text-muted">
-                    {p.narration.slice(0, 160)}
-                    {p.narration.length > 160 && "…"}
-                  </p>
-                )}
-              </div>
+            {pieces.map((p) => (
+              <PieceCard
+                key={p.id}
+                jobId={jobId}
+                piece={p}
+                onChanged={() =>
+                  fetchPieces(jobId).then(setPieces).catch(() => {})
+                }
+              />
             ))}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------------- um cartão de memória, com revisar/editar/excluir ---------------- */
+
+function PieceCard({
+  jobId,
+  piece,
+  onChanged,
+}: {
+  jobId: string;
+  piece: Piece;
+  onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(piece.title);
+  const [content, setContent] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function openEdit() {
+    setError(null);
+    setEditing(true);
+    if (content === null) {
+      try {
+        const item = await getMemoryItem(jobId, piece.id);
+        setTitle(item.title);
+        setContent(item.content);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao abrir.");
+      }
+    }
+  }
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      // imagem: o conteúdo editável é a narração; texto: o corpo inteiro
+      await editMemory(jobId, piece.id, title, content ?? undefined);
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível salvar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function del() {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteMemory(jobId, piece.id);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível excluir.");
+      setBusy(false);
+      setConfirmDel(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-xl border border-soul/40 bg-surface p-4">
+        <label className="block text-xs uppercase tracking-wide text-soul">
+          Título
+        </label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-line bg-base px-3 py-2 text-ink outline-none focus:border-soul"
+        />
+        <label className="mt-3 block text-xs uppercase tracking-wide text-soul">
+          {piece.kind === "imagem" ? "Narração" : "Texto"}
+        </label>
+        {content === null ? (
+          <p className="mt-1 text-sm text-muted">Carregando…</p>
+        ) : (
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={Math.min(14, Math.max(4, content.split("\n").length + 1))}
+            className="mt-1 w-full rounded-lg border border-line bg-base px-3 py-2 text-ink leading-relaxed outline-none focus:border-soul"
+          />
+        )}
+        {error && <p className="mt-2 text-sm text-soul">{error}</p>}
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={busy || content === null}
+            className="rounded-full bg-soul px-5 py-2 text-sm font-medium text-[#241703] disabled:opacity-40"
+          >
+            {busy ? "Salvando…" : "Salvar correção"}
+          </button>
+          <button
+            onClick={() => {
+              setEditing(false);
+              setTitle(piece.title);
+            }}
+            className="text-sm text-muted hover:text-ink"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-surface p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-wide text-soul">
+              {piece.kind}
+            </span>
+            <span className="text-ink">{piece.title}</span>
+          </div>
+          {piece.narration && (
+            <p className="mt-1 text-sm leading-relaxed text-muted">
+              {piece.narration.slice(0, 160)}
+              {piece.narration.length > 160 && "…"}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            onClick={openEdit}
+            className="text-xs text-muted hover:text-ink"
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => setConfirmDel(true)}
+            className="text-xs text-muted hover:text-soul"
+          >
+            Excluir
+          </button>
+        </div>
+      </div>
+
+      {confirmDel && (
+        <div className="mt-3 rounded-lg border border-soul/40 bg-base p-3 text-sm">
+          <p className="text-ink">Excluir esta memória? Não há como desfazer.</p>
+          <div className="mt-2 flex gap-3">
+            <button
+              onClick={del}
+              disabled={busy}
+              className="rounded-full bg-soul px-4 py-1.5 text-xs font-medium text-[#241703] disabled:opacity-40"
+            >
+              {busy ? "Excluindo…" : "Sim, excluir"}
+            </button>
+            <button
+              onClick={() => setConfirmDel(false)}
+              className="text-xs text-muted hover:text-ink"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="mt-2 text-sm text-soul">{error}</p>}
     </div>
   );
 }

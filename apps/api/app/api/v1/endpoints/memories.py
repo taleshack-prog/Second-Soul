@@ -45,14 +45,20 @@ def _dir(job_id: str) -> Path:
     return d
 
 
-def _append_essence(job_id: str, content: str, source: str, title: str) -> None:
-    """Acrescenta à essência — é o que o gêmeo passa a conhecer."""
+def _append_essence(job_id: str, content: str, source: str, title: str,
+                    piece_id: str = "") -> None:
+    """Acrescenta à essência — é o que o gêmeo passa a conhecer.
+
+    piece_id liga esta linha à peça correspondente no acervo, para permitir
+    editar e excluir depois (linhas antigas não têm e são casadas por heurística).
+    """
     d = _dir(job_id)
     row = {
         "role": "user",
         "content": content,
         "source": source,
         "file_name": title,
+        "piece_id": piece_id,
         "added_at": time.time(),
     }
     with open(d / "essencia.jsonl", "a", encoding="utf-8") as fh:
@@ -71,6 +77,58 @@ def _reindex(background: BackgroundTasks, job_id: str) -> None:
     background.add_task(_build_index, job_id)
 
 
+# ---------------- leitura/escrita dos registros (editar e excluir) ----------------
+
+def _read_jsonl(path: Path) -> list[dict]:
+    rows: list[dict] = []
+    if path.exists():
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip():
+                    rows.append(json.loads(line))
+    return rows
+
+
+def _write_jsonl(path: Path, rows: list[dict]) -> None:
+    """Reescreve o arquivo inteiro de forma atômica (temp + replace).
+
+    Os .jsonl eram só-acrescentar; editar/excluir exige reescrever. O temp no
+    mesmo diretório + os.replace evita deixar o arquivo corrompido se algo
+    falhar no meio."""
+    import os
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    os.replace(tmp, path)
+
+
+def _match_essence_idx(ess_rows: list[dict], piece: dict) -> int | None:
+    """Acha a linha da essência que corresponde a uma peça.
+
+    Primeiro pelo piece_id (linhas novas). Para linhas antigas (sem piece_id),
+    casa por título + início do conteúdo — na criação a narração da peça é o
+    conteúdo truncado em 400, então o conteúdo da essência começa pela narração.
+    Devolve o índice ou None.
+    """
+    pid = piece.get("id", "")
+    for i, r in enumerate(ess_rows):
+        if pid and r.get("piece_id") == pid:
+            return i
+    # heurística para linhas antigas sem piece_id
+    title = (piece.get("title") or "").strip()
+    narr = (piece.get("narration") or "").strip()
+    for i, r in enumerate(ess_rows):
+        if r.get("piece_id"):
+            continue  # já ligada a outra peça
+        if (r.get("file_name") or "").strip() != title:
+            continue
+        content = (r.get("content") or "").strip()
+        if narr and (content[:400].strip() == narr or narr in content):
+            return i
+    return None
+
+
 # ---------------- memória escrita ----------------
 
 class TextMemory(BaseModel):
@@ -82,10 +140,12 @@ class TextMemory(BaseModel):
 async def add_text(job_id: str, body: TextMemory, background: BackgroundTasks):
     """Uma crônica, uma história de família, uma decisão que quis registrar."""
     title = body.title.strip() or "Memória escrita"
-    _append_essence(job_id, body.content.strip(), "escrita", title)
+    content = body.content.strip()
+    piece_id = uuid.uuid4().hex[:10]
+    _append_essence(job_id, content, "escrita", title, piece_id)
     _register_piece(job_id, {
-        "id": uuid.uuid4().hex[:10], "kind": "texto", "title": title,
-        "narration": body.content.strip()[:400], "added_at": time.time(),
+        "id": piece_id, "kind": "texto", "title": title,
+        "narration": content[:400], "added_at": time.time(),
     })
     _reindex(background, job_id)
     return {"saved": True, "kind": "texto", "title": title,
@@ -117,9 +177,10 @@ async def add_file(
                 else data.decode("utf-8", errors="ignore")).strip()
         if len(text) < 10:
             raise HTTPException(422, "Não encontramos texto nesse arquivo.")
-        _append_essence(job_id, text, "arquivo", display)
+        piece_id = uuid.uuid4().hex[:10]
+        _append_essence(job_id, text, "arquivo", display, piece_id)
         _register_piece(job_id, {
-            "id": uuid.uuid4().hex[:10], "kind": "texto", "title": display,
+            "id": piece_id, "kind": "texto", "title": display,
             "narration": text[:400], "added_at": time.time(),
         })
         _reindex(background, job_id)
@@ -142,9 +203,10 @@ async def add_file(
         if not text.strip():
             raise HTTPException(422, "Não conseguimos ouvir fala nesse arquivo.")
 
-        _append_essence(job_id, text.strip(), "transcricao", display)
+        piece_id = uuid.uuid4().hex[:10]
+        _append_essence(job_id, text.strip(), "transcricao", display, piece_id)
         _register_piece(job_id, {
-            "id": uuid.uuid4().hex[:10],
+            "id": piece_id,
             "kind": "audio" if ext in _AUDIO_EXT else "video",
             "title": display, "narration": text.strip()[:400],
             "added_at": time.time(),
@@ -163,7 +225,7 @@ async def add_file(
 
         narr = narration.strip()
         if narr:
-            _append_essence(job_id, f"Sobre {display}: {narr}", "peca", display)
+            _append_essence(job_id, f"Sobre {display}: {narr}", "peca", display, piece_id)
             _reindex(background, job_id)
         _register_piece(job_id, {
             "id": piece_id, "kind": "imagem", "title": display,
@@ -252,3 +314,133 @@ async def list_memories(job_id: str):
                     pieces.append(json.loads(line))
     pieces.sort(key=lambda p: p.get("added_at", 0), reverse=True)
     return {"pieces": pieces, "total": len(pieces)}
+
+
+# ---------------- revisar, editar e excluir uma memória ----------------
+
+def _find_piece(d: Path, piece_id: str) -> tuple[list[dict], int]:
+    """Carrega as peças e devolve (peças, índice da peça). 404 se não achar."""
+    pieces = _read_jsonl(d / "acervo_pecas.jsonl")
+    for i, p in enumerate(pieces):
+        if p.get("id") == piece_id:
+            return pieces, i
+    raise HTTPException(404, "Memória não encontrada.")
+
+
+@router.get("/{job_id}/item/{piece_id}")
+async def get_item(job_id: str, piece_id: str):
+    """Devolve a memória completa para revisão — o texto inteiro, não o resumo."""
+    d = _dir(job_id)
+    pieces, idx = _find_piece(d, piece_id)
+    piece = pieces[idx]
+    ess = _read_jsonl(d / "essencia.jsonl")
+    ei = _match_essence_idx(ess, piece)
+
+    full = piece.get("narration", "")
+    if ei is not None:
+        content = ess[ei].get("content", "")
+        # para imagens o conteúdo da essência é "Sobre {título}: {narração}";
+        # devolvemos só a narração para edição
+        if piece.get("kind") == "imagem":
+            prefix = f"Sobre {piece.get('title','')}: "
+            full = content[len(prefix):] if content.startswith(prefix) else content
+        else:
+            full = content
+    return {
+        "id": piece["id"],
+        "kind": piece.get("kind", "texto"),
+        "title": piece.get("title", ""),
+        "content": full,
+        "has_image": bool(piece.get("file")),
+    }
+
+
+class EditItem(BaseModel):
+    title: str = Field(default="", max_length=200)
+    content: str | None = Field(default=None, max_length=100_000)
+
+
+@router.patch("/{job_id}/item/{piece_id}")
+async def edit_item(job_id: str, piece_id: str, body: EditItem,
+                    background: BackgroundTasks):
+    """Corrige o título e/ou o texto de uma memória, nos dois lados (acervo +
+    essência), e manda o gêmeo reaprender."""
+    d = _dir(job_id)
+    pieces, idx = _find_piece(d, piece_id)
+    piece = pieces[idx]
+    kind = piece.get("kind", "texto")
+
+    new_title = body.title.strip() or piece.get("title", "") or "Memória"
+    # conteúdo: se não veio, mantém o atual (só mudou o título)
+    keep_content = body.content is None
+    new_content = (body.content or "").strip()
+
+    ess = _read_jsonl(d / "essencia.jsonl")
+    ei = _match_essence_idx(ess, piece)
+    if keep_content:
+        if ei is not None:
+            cur = ess[ei].get("content", "")
+            if kind == "imagem":
+                prefix = f"Sobre {piece.get('title','')}: "
+                new_content = cur[len(prefix):] if cur.startswith(prefix) else cur
+            else:
+                new_content = cur
+        else:
+            new_content = piece.get("narration", "")
+
+    # --- atualiza a peça (o que o álbum mostra) ---
+    piece["title"] = new_title
+    piece["narration"] = new_content if kind == "imagem" else new_content[:400]
+    pieces[idx] = piece
+    _write_jsonl(d / "acervo_pecas.jsonl", pieces)
+
+    # --- atualiza a linha da essência (o que o gêmeo sabe) ---
+    if kind == "imagem":
+        ess_content = f"Sobre {new_title}: {new_content}" if new_content else ""
+    else:
+        ess_content = new_content
+
+    if ei is not None:
+        if ess_content:
+            ess[ei]["content"] = ess_content
+            ess[ei]["file_name"] = new_title
+            ess[ei]["piece_id"] = piece_id
+        else:  # imagem ficou sem narração: a essência não tem o que aprender
+            ess.pop(ei)
+        _write_jsonl(d / "essencia.jsonl", ess)
+    elif ess_content:
+        # não havia linha (ex.: imagem antes sem narração): cria uma
+        _append_essence(job_id, ess_content,
+                        "peca" if kind == "imagem" else "escrita",
+                        new_title, piece_id)
+
+    _reindex(background, job_id)
+    return {"saved": True, "id": piece_id, "title": new_title}
+
+
+@router.delete("/{job_id}/item/{piece_id}")
+async def delete_item(job_id: str, piece_id: str, background: BackgroundTasks):
+    """Remove uma memória por inteiro: a peça, a linha da essência e, se for
+    imagem, o arquivo. O gêmeo deixa de conhecê-la."""
+    d = _dir(job_id)
+    pieces, idx = _find_piece(d, piece_id)
+    piece = pieces.pop(idx)
+    _write_jsonl(d / "acervo_pecas.jsonl", pieces)
+
+    ess = _read_jsonl(d / "essencia.jsonl")
+    ei = _match_essence_idx(ess, piece)
+    if ei is not None:
+        ess.pop(ei)
+        _write_jsonl(d / "essencia.jsonl", ess)
+
+    # apaga o arquivo da imagem, se houver
+    if piece.get("file"):
+        img = d / "pecas" / piece["file"]
+        try:
+            if img.exists():
+                img.unlink()
+        except OSError:
+            pass
+
+    _reindex(background, job_id)
+    return {"deleted": True, "id": piece_id}

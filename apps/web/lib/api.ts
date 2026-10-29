@@ -342,6 +342,48 @@ export async function fetchPieces(jobId: string): Promise<Piece[]> {
   return (await res.json()).pieces ?? [];
 }
 
+export type MemoryItem = {
+  id: string;
+  kind: "texto" | "imagem" | "audio" | "video";
+  title: string;
+  content: string; // texto completo (não o resumo)
+  has_image: boolean;
+};
+
+/** Memória completa para revisão — o texto inteiro, não os 160 caracteres. */
+export async function getMemoryItem(
+  jobId: string,
+  pieceId: string
+): Promise<MemoryItem> {
+  const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`);
+  if (!res.ok) await fail(res, "Não foi possível abrir essa memória.");
+  return res.json();
+}
+
+/** Corrige título e/ou conteúdo. Deixe content como undefined para mudar só o título. */
+export async function editMemory(
+  jobId: string,
+  pieceId: string,
+  title: string,
+  content?: string
+): Promise<void> {
+  const body: { title: string; content?: string } = { title };
+  if (content !== undefined) body.content = content;
+  const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) await fail(res, "Não foi possível salvar a correção.");
+}
+
+export async function deleteMemory(jobId: string, pieceId: string): Promise<void> {
+  const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) await fail(res, "Não foi possível excluir essa memória.");
+}
+
 /* ---------- consentimento e direitos ---------- */
 
 export async function getConsent(jobId: string): Promise<boolean> {
