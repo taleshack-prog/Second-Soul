@@ -160,9 +160,9 @@ async def talk(body: TalkIn):
         try:
             resp = await client.chat.completions.create(
                 # temperatura mais baixa = menos "criatividade" = menos
-                # confabulação. Fidelidade vem antes do floreio neste produto.
+                # confabulação/enfeite. Fidelidade vem antes do floreio aqui.
                 model=settings.GROQ_MODEL, messages=messages,
-                temperature=0.5, max_tokens=1024,
+                temperature=0.4, max_tokens=1024,
             )
             return {
                 "message": resp.choices[0].message.content or "",
