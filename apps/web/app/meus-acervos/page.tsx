@@ -91,7 +91,7 @@ export default function MeusAcervosPage() {
               </div>
               {a.twin_ready && a.status !== "dormant" ? (
                 <Link
-                  href={`/s/${a.job_id}`}
+                  href={`/essencia/${a.job_id}`}
                   className="shrink-0 rounded-lg bg-soul text-base text-sm font-medium px-4 py-2 hover:brightness-110 transition"
                 >
                   Conversar

@@ -234,6 +234,18 @@ export async function saveProfile(
 
 /* ---------- conversar com a essência ---------- */
 
+/** Transcreve a fala de uma pergunta (voz → texto). Não guarda o áudio. */
+export async function transcribeVoice(blob: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("file", blob, "pergunta.webm");
+  const res = await fetch(`${API}/api/v1/twin/transcribe`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) await fail(res, "Não consegui transcrever a fala.");
+  return (await res.json()).text ?? "";
+}
+
 export type TwinReady = {
   status: "missing" | "building" | "ready" | "error";
   backend?: string;

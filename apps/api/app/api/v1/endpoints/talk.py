@@ -14,13 +14,37 @@ import json
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core import sessions
 
 router = APIRouter(prefix="/twin", tags=["Gêmeo Digital"])
+
+_VOICE_MAX_MB = 25  # limite da API de transcrição
+
+
+@router.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)):
+    """Transcreve a fala de uma PERGUNTA — transitório, não guarda nada.
+
+    Diferente de /memories/upload (que grava a fala como memória), aqui o áudio
+    é só o canal da pergunta: transcreve e descarta. É o que permite conversar
+    por voz com o gêmeo.
+    """
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(503, "Transcrição de voz indisponível no momento.")
+    data = await file.read(_VOICE_MAX_MB * 1024 * 1024 + 1)
+    if len(data) > _VOICE_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, f"Áudio acima de {_VOICE_MAX_MB} MB.")
+    if not data:
+        raise HTTPException(422, "Áudio vazio.")
+    from app.api.v1.endpoints.memories import _transcribe
+    text = (await _transcribe(data, file.filename or "pergunta.webm")).strip()
+    if not text:
+        raise HTTPException(422, "Não consegui ouvir a pergunta. Tente de novo.")
+    return {"text": text}
 
 # cache do índice por sessão: (mtime do meta.json, índice)
 # o mtime evita servir um índice velho depois que o perfil foi salvo
