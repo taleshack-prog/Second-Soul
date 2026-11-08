@@ -264,7 +264,7 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
           if (!node) continue;
           if (hovered.current !== i) angles.current[i] += speeds[i] * dt;
           const p = ease(Math.min(1, Math.max(0, (t - emergeDelay(i)) / EMERGE)));
-          const radius = R * (0.94 + (i % 2) * 0.1) * p;
+          const radius = R * (0.98 + (i % 2) * 0.1) * p;
           const a = angles.current[i];
           const x = Math.cos(a) * radius;
           const y = Math.sin(a) * radius * 0.82; // leve achatamento elíptico
@@ -287,7 +287,7 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
       {/* galáxia */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div
-          className="h-[50vmin] w-[50vmin] max-h-[620px] max-w-[620px] bg-cover bg-center"
+          className="h-[58vmin] w-[58vmin] max-h-[700px] max-w-[700px] bg-cover bg-center"
           style={{
             backgroundImage: "url(/galaxy.webp)",
             WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
@@ -339,7 +339,7 @@ function Stacked({ onOpen }: { onOpen: (id: string) => void }) {
     <div className="relative z-10 mx-auto max-w-xl px-5 pb-16">
       <div className="relative py-10 text-center">
         <div
-          className="mx-auto h-64 w-64 bg-cover bg-center"
+          className="mx-auto h-72 w-72 bg-cover bg-center"
           style={{
             backgroundImage: "url(/galaxy.webp)",
             WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 75%)",
