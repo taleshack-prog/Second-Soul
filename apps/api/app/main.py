@@ -49,7 +49,11 @@ def _allowed_origins() -> list[str]:
     variável: o padrão é fechado, e só o site declarado (mais o localhost do
     desenvolvimento) passa.
     """
-    origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    origins = [
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        # domínio próprio do Second Soul (apex + www)
+        "https://secondsoul.com.br", "https://www.secondsoul.com.br",
+    ]
     front = (settings.FRONTEND_URL or "").strip().rstrip("/")
     if front and front not in origins:
         origins.append(front)
