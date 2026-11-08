@@ -264,7 +264,7 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
           if (!node) continue;
           if (hovered.current !== i) angles.current[i] += speeds[i] * dt;
           const p = ease(Math.min(1, Math.max(0, (t - emergeDelay(i)) / EMERGE)));
-          const radius = R * (0.9 + (i % 2) * 0.12) * p;
+          const radius = R * (0.94 + (i % 2) * 0.1) * p;
           const a = angles.current[i];
           const x = Math.cos(a) * radius;
           const y = Math.sin(a) * radius * 0.82; // leve achatamento elíptico
@@ -287,12 +287,12 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
       {/* galáxia */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div
-          className="h-[46vmin] w-[46vmin] max-h-[560px] max-w-[560px] bg-cover bg-center"
+          className="h-[50vmin] w-[50vmin] max-h-[620px] max-w-[620px] bg-cover bg-center"
           style={{
             backgroundImage: "url(/galaxy.webp)",
             WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
             maskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
-            animation: "spin-slow 240s linear infinite",
+            animation: "spin-slow 170s linear infinite",
           }}
         />
       </div>
@@ -339,12 +339,12 @@ function Stacked({ onOpen }: { onOpen: (id: string) => void }) {
     <div className="relative z-10 mx-auto max-w-xl px-5 pb-16">
       <div className="relative py-10 text-center">
         <div
-          className="mx-auto h-56 w-56 bg-cover bg-center"
+          className="mx-auto h-64 w-64 bg-cover bg-center"
           style={{
             backgroundImage: "url(/galaxy.webp)",
             WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 75%)",
             maskImage: "radial-gradient(circle, #000 55%, transparent 75%)",
-            animation: "spin-slow 240s linear infinite",
+            animation: "spin-slow 170s linear infinite",
           }}
         />
         <h1 className="mt-4 font-display text-3xl leading-tight text-ink">
