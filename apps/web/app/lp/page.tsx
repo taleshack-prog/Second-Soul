@@ -250,6 +250,7 @@ function Plans() {
         "50 anos de guarda garantida",
         "Herdeiros e liberação pós-morte",
         "Apoio à sucessão digital",
+        "Selo de autenticidade (em breve)",
       ],
       highlight: false,
     },
