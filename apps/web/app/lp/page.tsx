@@ -73,7 +73,7 @@ const MOONS: Moon[] = [
   {
     id: "planos",
     title: "Planos",
-    teaser: "Um legado não é assinatura descartável.",
+    teaser: "Assine conforme usa, ou garanta para sempre.",
     body: [],
   },
 ];
@@ -91,41 +91,30 @@ const PLANS: Plan[] = [
   {
     name: "Premium",
     price: "R$ 29",
-    period: "/mês",
-    blurb: "Para construir e conviver com a essência no dia a dia.",
+    period: "/mês · ou R$ 330/ano",
+    blurb: "O produto completo, enquanto a assinatura durar.",
     features: [
       "Acervo multimodal ilimitado",
       "Conversa por texto e voz",
       "Álbum completo de recordações",
-      "Convidados em vida",
+      "Compartilhe em vida e defina herdeiros",
+      "Liberação pós-morte para herdeiros",
     ],
     highlight: false,
-  },
-  {
-    name: "Vitalício",
-    price: "R$ 1.497",
-    period: "pagamento único",
-    blurb: "Pague uma vez; a essência permanece, sem mensalidade.",
-    features: [
-      "Tudo do Premium, para sempre",
-      "Sem cobrança recorrente",
-      "Prioridade em novos recursos",
-    ],
-    highlight: true,
   },
   {
     name: "Herança",
-    price: "R$ 4.997",
+    price: "R$ 6.780",
     period: "pagamento único",
-    blurb: "Para quem trata o legado como sucessão, com apoio jurídico.",
+    blurb: "Garanta para sempre, de uma vez — com respaldo de sucessão.",
     features: [
-      "Tudo do Vitalício",
-      "50 anos de guarda garantida",
+      "Tudo do Premium, sem mensalidade",
+      "Guarda perpétua garantida",
       "Herdeiros e liberação pós-morte",
-      "Apoio à sucessão digital",
+      "Respaldo jurídico à sucessão",
       "Selo de autenticidade (em breve)",
     ],
-    highlight: false,
+    highlight: true,
   },
 ];
 
@@ -431,8 +420,8 @@ function PlansPanel() {
     <div>
       <h2 className="font-display text-2xl text-ink">Planos</h2>
       <p className="mt-2 text-[14px] leading-relaxed text-muted">
-        Um legado não é assinatura descartável — por isso há posse definitiva, não
-        só mensalidade. Preços de lançamento, sujeitos a ajuste.
+        Pague conforme usa, ou garanta para sempre de uma vez. Compartilhar e
+        herdeiros entram nos dois. Preços de lançamento, sujeitos a ajuste.
       </p>
       <div className="mt-5 space-y-3">
         {PLANS.map((p) => (
