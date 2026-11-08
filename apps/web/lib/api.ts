@@ -234,6 +234,21 @@ export async function saveProfile(
 
 /* ---------- conversar com a essência ---------- */
 
+/** Entra na lista de espera da landing. Idempotente por e-mail. */
+export async function joinWaitlist(
+  email: string,
+  planInterest = "",
+  name = ""
+): Promise<{ joined: boolean; already: boolean }> {
+  const res = await fetch(`${API}/api/v1/waitlist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, plan_interest: planInterest, name, source: "lp" }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível entrar na lista.");
+  return res.json();
+}
+
 /** Transcreve a fala de uma pergunta (voz → texto). Não guarda o áudio. */
 export async function transcribeVoice(blob: Blob): Promise<string> {
   const form = new FormData();

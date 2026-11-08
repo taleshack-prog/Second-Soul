@@ -131,3 +131,20 @@ class ReleaseRequest(Base):
     decided_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class Waitlist(Base):
+    """Interessados na landing, antes do cadastro pago abrir.
+
+    Sem freemium e sem Stripe ainda: a landing capta e-mails aqui até a
+    cobrança entrar. É também o começo do funil de vendas.
+    """
+
+    __tablename__ = "waitlist"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    plan_interest: Mapped[str] = mapped_column(String(40), default="")  # premium/vitalicio/heranca
+    source: Mapped[str] = mapped_column(String(80), default="lp")  # de onde veio
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
