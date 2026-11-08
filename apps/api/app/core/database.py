@@ -40,13 +40,31 @@ async def get_db() -> AsyncSession:
         yield session
 
 
+# colunas acrescentadas a `accounts` DEPOIS da tabela existir em produção.
+# create_all cria tabelas novas, mas NÃO altera as já existentes — então estas
+# precisam de um ALTER idempotente. Só roda no Postgres (ADD COLUMN IF NOT EXISTS).
+_ACCOUNT_MIGRATIONS = (
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT ''",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS plan_status VARCHAR(20) DEFAULT ''",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(64)",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(64)",
+    "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ",
+)
+
+
 async def init_models() -> None:
-    """Cria as tabelas se ainda não existem. Chamado na subida da API.
+    """Cria as tabelas se ainda não existem e aplica micro-migrações de coluna.
 
     Importa os modelos antes do create_all para que estejam registrados no
-    metadata. Idempotente: create_all não recria o que já existe.
+    metadata. Idempotente: create_all não recria o que já existe; os ALTER usam
+    IF NOT EXISTS e só rodam no Postgres.
     """
+    from sqlalchemy import text
+
     from app.models import account  # noqa: F401  (registra as tabelas)
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if conn.dialect.name == "postgresql":
+            for stmt in _ACCOUNT_MIGRATIONS:
+                await conn.execute(text(stmt))

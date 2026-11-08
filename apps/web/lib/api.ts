@@ -234,6 +234,20 @@ export async function saveProfile(
 
 /* ---------- conversar com a essência ---------- */
 
+/** Inicia o checkout do Stripe para um plano e redireciona para o pagamento. */
+export async function startCheckout(
+  plan: "premium_month" | "premium_year" | "heranca"
+): Promise<void> {
+  const res = await fetch(`${API}/api/v1/billing/checkout`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ plan }),
+  });
+  if (!res.ok) await fail(res, "Não foi possível iniciar o pagamento.");
+  const data = (await res.json()) as { url: string };
+  window.location.href = data.url;
+}
+
 /** Entra na lista de espera da landing. Idempotente por e-mail. */
 export async function joinWaitlist(
   email: string,

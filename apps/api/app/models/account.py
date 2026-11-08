@@ -57,6 +57,15 @@ class Account(Base):
     name: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
+    # --- cobrança (Stripe) ---
+    plan: Mapped[str] = mapped_column(String(20), default="")        # premium | heranca | ""
+    plan_status: Mapped[str] = mapped_column(String(20), default="")  # active | past_due | canceled | ""
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     links: Mapped[list["ArchiveLink"]] = relationship(
         back_populates="account", cascade="all, delete-orphan"
     )

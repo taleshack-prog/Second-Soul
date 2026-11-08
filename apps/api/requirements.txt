@@ -16,3 +16,4 @@ pypdf==5.1.0
 scikit-learn==1.5.2
 sentence-transformers==3.2.1
 bcrypt==4.2.1
+stripe==11.1.0

@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { joinWaitlist } from "@/lib/api";
+import { joinWaitlist, me, startCheckout } from "@/lib/api";
 
 /* ---------------- conteúdo ---------------- */
 
@@ -138,6 +138,11 @@ const STARS = Array.from({ length: 46 }, (_, i) => {
 export default function LandingPage() {
   const [mode, setMode] = useState<"stacked" | "orbital">("stacked");
   const [active, setActive] = useState<string | null>(null); // moon id, "waitlist", null
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    me().then((a) => setLoggedIn(!!a));
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
@@ -168,7 +173,7 @@ export default function LandingPage() {
           {active === "waitlist" ? (
             <WaitlistPanel />
           ) : active === "planos" ? (
-            <PlansPanel />
+            <PlansPanel loggedIn={loggedIn} onJoin={() => setActive("waitlist")} />
           ) : (
             <MoonPanel moon={MOONS.find((m) => m.id === active)!} />
           )}
@@ -415,7 +420,21 @@ function MoonPanel({ moon }: { moon: Moon }) {
   );
 }
 
-function PlansPanel() {
+function PlansPanel({ loggedIn, onJoin }: { loggedIn: boolean; onJoin: () => void }) {
+  const [busy, setBusy] = useState<string>("");
+  const [err, setErr] = useState("");
+
+  async function buy(plan: "premium_month" | "premium_year" | "heranca") {
+    setBusy(plan);
+    setErr("");
+    try {
+      await startCheckout(plan); // redireciona para o Stripe
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Erro ao iniciar o pagamento.");
+      setBusy("");
+    }
+  }
+
   return (
     <div>
       <h2 className="font-display text-2xl text-ink">Planos</h2>
@@ -424,33 +443,100 @@ function PlansPanel() {
         herdeiros entram nos dois. Preços de lançamento, sujeitos a ajuste.
       </p>
       <div className="mt-5 space-y-3">
-        {PLANS.map((p) => (
-          <div
-            key={p.name}
-            className={`rounded-2xl border p-4 ${
-              p.highlight ? "border-soul bg-base" : "border-line bg-base/50"
-            }`}
-          >
-            <div className="flex items-baseline justify-between">
-              <h3 className="font-display text-lg text-ink">{p.name}</h3>
-              <div className="text-right">
-                <span className="text-xl font-semibold text-ink">{p.price}</span>{" "}
-                <span className="text-xs text-muted">{p.period}</span>
+        {PLANS.map((p) => {
+          const isHeranca = p.name === "Herança";
+          return (
+            <div
+              key={p.name}
+              className={`rounded-2xl border p-4 ${
+                p.highlight ? "border-soul bg-base" : "border-line bg-base/50"
+              }`}
+            >
+              <div className="flex items-baseline justify-between">
+                <h3 className="font-display text-lg text-ink">{p.name}</h3>
+                <div className="text-right">
+                  <span className="text-xl font-semibold text-ink">{p.price}</span>{" "}
+                  <span className="text-xs text-muted">{p.period}</span>
+                </div>
               </div>
+              <p className="mt-1 text-[13px] text-muted">{p.blurb}</p>
+              <ul className="mt-3 space-y-1.5">
+                {p.features.map((f) => (
+                  <li key={f} className="flex gap-2 text-[13px] text-ink/85">
+                    <span className="text-soul">·</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {loggedIn ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {isHeranca ? (
+                    <PlanButton
+                      label="Comprar"
+                      busy={busy === "heranca"}
+                      onClick={() => buy("heranca")}
+                      primary
+                    />
+                  ) : (
+                    <>
+                      <PlanButton
+                        label="Assinar mensal"
+                        busy={busy === "premium_month"}
+                        onClick={() => buy("premium_month")}
+                        primary
+                      />
+                      <PlanButton
+                        label="Anual"
+                        busy={busy === "premium_year"}
+                        onClick={() => buy("premium_year")}
+                      />
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
-            <p className="mt-1 text-[13px] text-muted">{p.blurb}</p>
-            <ul className="mt-3 space-y-1.5">
-              {p.features.map((f) => (
-                <li key={f} className="flex gap-2 text-[13px] text-ink/85">
-                  <span className="text-soul">·</span>
-                  {f}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {err && <p className="mt-3 text-sm text-soul">{err}</p>}
+
+      {!loggedIn && (
+        <button
+          onClick={onJoin}
+          className="mt-5 w-full rounded-full bg-soul px-4 py-2.5 text-sm font-medium text-[#241703] transition hover:brightness-110"
+        >
+          Entrar na lista de espera
+        </button>
+      )}
     </div>
+  );
+}
+
+function PlanButton({
+  label,
+  busy,
+  onClick,
+  primary,
+}: {
+  label: string;
+  busy: boolean;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={busy}
+      className={`rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${
+        primary
+          ? "bg-soul text-[#241703] hover:brightness-110"
+          : "border border-line text-ink hover:border-soul/50"
+      }`}
+    >
+      {busy ? "…" : label}
+    </button>
   );
 }
 

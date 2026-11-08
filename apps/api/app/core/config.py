@@ -48,10 +48,15 @@ class Settings(BaseSettings):
     STELLAR_NETWORK: str = "testnet"
     STELLAR_HORIZON_URL: str = "https://horizon-testnet.stellar.org"
 
-    # Pricing (BRL)
-    PREMIUM_PRICE: float = 29.0
-    VITALICIO_PRICE: float = 1497.0
-    HERANCA_PRICE: float = 4997.0
+    # Pricing (BRL) — em centavos para o Stripe
+    PREMIUM_MONTH_CENTS: int = 2900     # R$ 29/mês
+    PREMIUM_YEAR_CENTS: int = 33000     # R$ 330/ano
+    HERANCA_CENTS: int = 678000         # R$ 6.780 pagamento único
+    CURRENCY: str = "brl"
+
+    # Stripe (modo teste até lançar). Defina as chaves no ambiente do Railway.
+    STRIPE_SECRET_KEY: str = ""         # sk_test_... (ou sk_live_... na produção)
+    STRIPE_WEBHOOK_SECRET: str = ""     # whsec_...
 
     # Limits
     FREEMIUM_INTERACTIONS_MONTHLY: int = 50
