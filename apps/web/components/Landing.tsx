@@ -297,10 +297,10 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
             width: "420px",
             height: "420px",
             backgroundImage: "url(/galaxy.webp)",
-            // revela quase a galáxia inteira (fade só na borda) — antes a
-            // máscara escondia ~45% e a fazia parecer pequena.
-            WebkitMaskImage: "radial-gradient(circle, #000 70%, transparent 92%)",
-            maskImage: "radial-gradient(circle, #000 70%, transparent 92%)",
+            // closest-side = círculo inscrito: some exatamente na borda e corta
+            // os cantos do quadrado da imagem (que antes giravam visíveis).
+            WebkitMaskImage: "radial-gradient(circle closest-side, #000 74%, transparent 99%)",
+            maskImage: "radial-gradient(circle closest-side, #000 74%, transparent 99%)",
             animation: "spin-slow 170s linear infinite",
           }}
         />
