@@ -221,7 +221,6 @@ export default function OnboardingWizard({
       </aside>
 
       <section className="max-w-xl">
-        {jobId && step >= 3 && <ReturnLink jobId={jobId} />}
         {step === 0 && (
           <div className="flex items-center gap-3 text-muted">
             <span className="h-2 w-2 animate-pulse rounded-full bg-soul" />
@@ -1667,49 +1666,6 @@ function StepAlbum({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ---------------- link de retorno ---------------- */
-
-function ReturnLink({ jobId }: { jobId: string }) {
-  const [copied, setCopied] = useState(false);
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/s/${jobId}`
-      : `/s/${jobId}`;
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      /* alguns navegadores bloqueiam; o texto continua visível para copiar */
-    }
-  }
-
-  return (
-    <div className="mb-8 rounded-2xl border border-soul/30 bg-soul/5 p-5">
-      <p className="text-sm text-ink">
-        <b>Guarde este endereço.</b> É a chave para voltar a esta essência —
-        em outro dia, em outro aparelho. Sem ele, não há como reencontrá-la.
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <code className="flex-1 overflow-x-auto rounded-lg bg-surface2 px-3 py-2 text-xs text-muted">
-          {url}
-        </code>
-        <button
-          onClick={copy}
-          className="rounded-full border border-soul/50 px-4 py-1.5 text-sm text-soul transition-colors hover:bg-soul/10"
-        >
-          {copied ? "Copiado" : "Copiar"}
-        </button>
-      </div>
-      <p className="mt-2 text-xs text-muted">
-        Envie para você mesmo por e-mail ou salve nos favoritos.
-      </p>
     </div>
   );
 }
