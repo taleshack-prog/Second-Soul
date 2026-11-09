@@ -13,9 +13,11 @@ Só contas em ADMIN_EMAILS entram aqui (dependência current_admin).
 
 from __future__ import annotations
 
+import shutil
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.endpoints.auth import current_admin
@@ -172,3 +174,54 @@ async def remove_link(body: UnlinkIn, _admin: Account = Depends(current_admin),
     await db.delete(link)
     await db.commit()
     return {"removed": True, "job_id": body.job_id, "email": email}
+
+
+# ---------------- exclusão de acervos (limpeza) ----------------
+
+def _is_empty(job_id: str) -> bool:
+    """Acervo vazio = passo 1: sem perfil, sem memórias, sem gêmeo. Nada a perder."""
+    st = sessions.state(job_id)
+    return bool(st.get("found")) and st.get("step", 0) == 1
+
+
+async def _purge(db: AsyncSession, job_id: str) -> None:
+    """Apaga o acervo do volume e todos os vínculos dele no banco."""
+    await db.execute(sa_delete(ArchiveLink).where(ArchiveLink.job_id == job_id))
+    d = sessions.session_dir(job_id)
+    if d.is_dir():
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@router.delete("/archive/{job_id}")
+async def delete_archive(job_id: str, _admin: Account = Depends(current_admin),
+                         db: AsyncSession = Depends(get_db)):
+    """Exclui UM acervo (volume + vínculos). Irreversível."""
+    if not sessions.exists(job_id):
+        raise HTTPException(404, "Esse acervo não existe no volume.")
+    await _purge(db, job_id)
+    await db.commit()
+    return {"removed": True, "job_id": job_id}
+
+
+@router.post("/cleanup-empty")
+async def cleanup_empty(_admin: Account = Depends(current_admin),
+                        db: AsyncSession = Depends(get_db)):
+    """Remove os acervos VAZIOS (passo 1) e SEM vínculo. Não toca no que tem
+    conteúdo nem no que já tem dono/herdeiro."""
+    root = sessions.SESSIONS_ROOT
+    if not root.is_dir():
+        return {"removed": 0, "job_ids": []}
+
+    linked = {lk.job_id for lk in (await db.scalars(select(ArchiveLink.job_id))).all()}
+    removed: list[str] = []
+    for p in sorted(root.glob("*")):
+        if not p.is_dir():
+            continue
+        job_id = p.name
+        if job_id in linked:
+            continue  # tem dono/herdeiro: preserva
+        if _is_empty(job_id):
+            shutil.rmtree(p, ignore_errors=True)
+            removed.append(job_id)
+    await db.commit()
+    return {"removed": len(removed), "job_ids": removed}

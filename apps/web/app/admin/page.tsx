@@ -7,6 +7,8 @@ import {
   adminArchives,
   adminAssign,
   adminUnlink,
+  adminDeleteArchive,
+  adminCleanupEmpty,
   clearToken,
   type AdminArchive,
 } from "@/lib/api";
@@ -50,6 +52,24 @@ export default function AdminPage() {
   }
 
   const semDono = archives.filter((a) => !a.owner_email).length;
+  const vazios = archives.filter((a) => a.step === 1 && !a.owner_email).length;
+
+  async function limparVazios() {
+    if (
+      !window.confirm(
+        `Remover ${vazios} acervo(s) vazio(s) (passo 1, sem dono)? Isto é irreversível.`
+      )
+    )
+      return;
+    setError("");
+    try {
+      const r = await adminCleanupEmpty();
+      await load();
+      setError(r.removed ? "" : "Nada para remover.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao limpar.");
+    }
+  }
 
   return (
     <main className="min-h-screen px-4 py-10 max-w-3xl mx-auto">
@@ -60,15 +80,25 @@ export default function AdminPage() {
             {archives.length} acervos · {semDono} sem dono
           </p>
         </div>
-        <button
-          onClick={() => {
-            clearToken();
-            router.replace("/entrar");
-          }}
-          className="text-sm text-muted hover:text-ink transition"
-        >
-          Sair
-        </button>
+        <div className="flex items-center gap-4 shrink-0">
+          {vazios > 0 && (
+            <button
+              onClick={limparVazios}
+              className="text-sm text-red-300/90 border border-red-900/50 rounded-lg px-3 py-1.5 hover:bg-red-950/40 transition"
+            >
+              Remover vazias ({vazios})
+            </button>
+          )}
+          <button
+            onClick={() => {
+              clearToken();
+              router.replace("/entrar");
+            }}
+            className="text-sm text-muted hover:text-ink transition"
+          >
+            Sair
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -122,6 +152,22 @@ function ArchiveRow({
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Erro.");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function excluir() {
+    if (
+      !window.confirm(`Excluir o acervo /s/${archive.job_id}? Irreversível.`)
+    )
+      return;
+    setBusy(true);
+    setMsg("");
+    try {
+      await adminDeleteArchive(archive.job_id);
+      onChange(); // recarrega: esta linha some
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Erro.");
       setBusy(false);
     }
   }
@@ -188,6 +234,16 @@ function ArchiveRow({
       )}
 
       {msg && <p className="text-xs text-red-300 mt-2">{msg}</p>}
+
+      <div className="mt-3 pt-3 border-t border-line/60 flex justify-end">
+        <button
+          onClick={excluir}
+          disabled={busy}
+          className="text-xs text-muted hover:text-red-300 transition disabled:opacity-50"
+        >
+          Excluir acervo
+        </button>
+      </div>
     </div>
   );
 }

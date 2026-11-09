@@ -654,3 +654,22 @@ export async function adminUnlink(jobId: string, email: string): Promise<void> {
   });
   if (!res.ok) await fail(res, "Não foi possível remover o vínculo.");
 }
+
+/** Exclui um acervo (volume + vínculos). Irreversível. */
+export async function adminDeleteArchive(jobId: string): Promise<void> {
+  const res = await fetch(`${API}/api/v1/admin/archive/${jobId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) await fail(res, "Não foi possível excluir o acervo.");
+}
+
+/** Remove todos os acervos vazios (passo 1) e sem vínculo. */
+export async function adminCleanupEmpty(): Promise<{ removed: number }> {
+  const res = await fetch(`${API}/api/v1/admin/cleanup-empty`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) await fail(res, "Não foi possível limpar os vazios.");
+  return (await res.json()) as { removed: number };
+}

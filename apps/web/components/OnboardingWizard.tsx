@@ -96,17 +96,24 @@ export default function OnboardingWizard({
     fetchStages().then(setStages).catch(() => setStages([]));
   }, []);
 
-  // a jornada começa por QUEM a pessoa é: a essência nasce aqui, sem arquivo
+  // a essência nasce no ACEITE do consentimento, não ao abrir a página — senão
+  // cada visita (ou clique sem querer) criava uma essência vazia no volume.
   useEffect(() => {
-    if (resumeJobId || jobId) return;
-    newSession()
-      .then(async (id) => {
-        setJobId(id);
-        setStep((await getConsent(id)) ? PERFIL : CONSENTIMENTO);
-      })
-      .catch(() => setResumeError("Não conseguimos iniciar. Tente recarregar."));
+    if (resumeJobId) return;
+    setStep(CONSENTIMENTO);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeJobId]);
+
+  // cria a essência (já vinculada à conta logada) e registra o consentimento.
+  async function beginEssencia() {
+    let id = jobId;
+    if (!id) {
+      id = await newSession();
+      setJobId(id);
+    }
+    await acceptConsent(id);
+    setStep(PERFIL);
+  }
 
   // retomada pelo link: abre no passo em que a pessoa parou
   useEffect(() => {
@@ -233,8 +240,8 @@ export default function OnboardingWizard({
           </p>
         )}
 
-        {step === CONSENTIMENTO && jobId && (
-          <StepConsent jobId={jobId} onAccept={() => setStep(PERFIL)} />
+        {step === CONSENTIMENTO && (
+          <StepConsent onConfirm={beginEssencia} />
         )}
 
         {step === PERFIL && jobId && (
@@ -1367,11 +1374,9 @@ function PieceCard({
 /* ---------------- Consentimento ---------------- */
 
 function StepConsent({
-  jobId,
-  onAccept,
+  onConfirm,
 }: {
-  jobId: string;
-  onAccept: () => void;
+  onConfirm: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1386,11 +1391,9 @@ function StepConsent({
     setBusy(true);
     setError(null);
     try {
-      await acceptConsent(jobId);
-      onAccept();
+      await onConfirm(); // cria a essência (vinculada à conta) e registra o aceite
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tente de novo.");
-    } finally {
       setBusy(false);
     }
   }
