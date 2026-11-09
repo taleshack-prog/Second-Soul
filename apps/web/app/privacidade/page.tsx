@@ -34,7 +34,7 @@ export default function Privacidade() {
             O Second Soul é operado pela Hack Tech Farm. Para qualquer pedido
             sobre seus dados — acesso, correção, exclusão, portabilidade ou
             revogação de consentimento — fale pelo e-mail{" "}
-            <b className="text-ink">privacidade@secondsoul.com.br</b>.
+            <b className="text-ink">hacktechfarm@proton.me</b>.
           </p>
         </Bloco>
 
