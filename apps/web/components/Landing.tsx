@@ -252,12 +252,15 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
       if (stage) {
         const w = stage.clientWidth;
         const h = stage.clientHeight;
-        const S = Math.min(w, h) / 2;
-        const R = S - 95; // raio da órbita, com margem pros cards não saírem da tela
-        // a galáxia é dimensionada EM RELAÇÃO à órbita: sempre cabe inteira,
-        // dentro do anel das luas, independente do formato da janela.
+        // órbita ELÍPTICA: usa a largura (que sobra) para espalhar os cards,
+        // e um raio vertical menor limitado pela altura. Assim a galáxia fica
+        // grande no centro e as luas bem afastadas, mesmo em janela baixa.
+        const Rx = Math.min(w / 2 - 110, 560);
+        const Ry = Math.min(h / 2 - 90, 380, Rx * 0.85);
+        // galáxia dimensionada pela altura disponível — grande, mas cabendo
+        // dentro do anel das luas (que passam por cima nas pontas de cima/baixo).
         if (galaxyRef.current) {
-          const d = Math.max(140, R * 1.1);
+          const d = Math.max(180, Math.min(Ry * 1.45, 520));
           galaxyRef.current.style.width = `${d}px`;
           galaxyRef.current.style.height = `${d}px`;
         }
@@ -266,11 +269,10 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
           if (!node) continue;
           if (hovered.current !== i) angles.current[i] += speeds[i] * dt;
           const p = ease(Math.min(1, Math.max(0, (t - emergeDelay(i)) / EMERGE)));
-          const radius = R * (1 + (i % 2) * 0.05) * p;
           const a = angles.current[i];
-          const x = Math.cos(a) * radius;
-          const y = Math.sin(a) * radius * 0.86; // leve achatamento elíptico
-          const scale = 0.6 + 0.4 * p;
+          const x = Math.cos(a) * Rx * p;
+          const y = Math.sin(a) * Ry * p;
+          const scale = 0.65 + 0.35 * p;
           node.style.transform = `translate(-50%,-50%) translate(${x}px, ${y}px) scale(${scale})`;
           node.style.opacity = String(p);
         }
