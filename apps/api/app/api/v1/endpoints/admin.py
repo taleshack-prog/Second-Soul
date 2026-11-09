@@ -212,7 +212,7 @@ async def cleanup_empty(_admin: Account = Depends(current_admin),
     if not root.is_dir():
         return {"removed": 0, "job_ids": []}
 
-    linked = {lk.job_id for lk in (await db.scalars(select(ArchiveLink.job_id))).all()}
+    linked = set((await db.scalars(select(ArchiveLink.job_id))).all())
     removed: list[str] = []
     for p in sorted(root.glob("*")):
         if not p.is_dir():
