@@ -228,6 +228,7 @@ function TopBar({ onJoin }: { onJoin: () => void }) {
 
 function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const galaxyRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const angles = useRef<number[]>(MOONS.map((_, i) => (i / MOONS.length) * Math.PI * 2));
   const hovered = useRef<number | null>(null);
@@ -252,16 +253,23 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
         const w = stage.clientWidth;
         const h = stage.clientHeight;
         const S = Math.min(w, h) / 2;
-        const R = S - 72; // raio da órbita, deixando margem pros cards
+        const R = S - 95; // raio da órbita, com margem pros cards não saírem da tela
+        // a galáxia é dimensionada EM RELAÇÃO à órbita: sempre cabe inteira,
+        // dentro do anel das luas, independente do formato da janela.
+        if (galaxyRef.current) {
+          const d = Math.max(140, R * 1.1);
+          galaxyRef.current.style.width = `${d}px`;
+          galaxyRef.current.style.height = `${d}px`;
+        }
         for (let i = 0; i < MOONS.length; i++) {
           const node = cardRefs.current[i];
           if (!node) continue;
           if (hovered.current !== i) angles.current[i] += speeds[i] * dt;
           const p = ease(Math.min(1, Math.max(0, (t - emergeDelay(i)) / EMERGE)));
-          const radius = R * (0.98 + (i % 2) * 0.1) * p;
+          const radius = R * (1 + (i % 2) * 0.05) * p;
           const a = angles.current[i];
           const x = Math.cos(a) * radius;
-          const y = Math.sin(a) * radius * 0.82; // leve achatamento elíptico
+          const y = Math.sin(a) * radius * 0.86; // leve achatamento elíptico
           const scale = 0.6 + 0.4 * p;
           node.style.transform = `translate(-50%,-50%) translate(${x}px, ${y}px) scale(${scale})`;
           node.style.opacity = String(p);
@@ -281,8 +289,11 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
       {/* galáxia */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div
-          className="h-[58vmin] w-[58vmin] max-h-[700px] max-w-[700px] bg-cover bg-center"
+          ref={galaxyRef}
+          className="bg-cover bg-center"
           style={{
+            width: "280px",
+            height: "280px",
             backgroundImage: "url(/galaxy.webp)",
             WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
             maskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
@@ -312,10 +323,10 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
           onMouseEnter={() => (hovered.current = i)}
           onMouseLeave={() => (hovered.current = null)}
           style={{ opacity: 0 }}
-          className="group absolute left-1/2 top-1/2 z-10 w-44 rounded-2xl border border-line/80 bg-surface/80 p-3.5 text-left backdrop-blur-sm transition-colors hover:border-soul hover:bg-surface"
+          className="group absolute left-1/2 top-1/2 z-10 w-36 rounded-xl border border-line/80 bg-surface/85 p-2.5 text-left backdrop-blur-sm transition-colors hover:border-soul hover:bg-surface"
         >
-          <span className="text-[13px] font-medium text-soul">{m.title}</span>
-          <p className="mt-1 text-[12.5px] leading-snug text-muted">{m.teaser}</p>
+          <span className="text-xs font-medium text-soul">{m.title}</span>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted">{m.teaser}</p>
         </button>
       ))}
 
