@@ -136,11 +136,16 @@ class MeOut(BaseModel):
     email: str
     name: str
     is_admin: bool = False
+    # cobrança: o front decide o funil (sem plano -> escolher; ativo -> criar)
+    plan: str = ""
+    plan_status: str = ""
 
 
 @router.get("/me", response_model=MeOut)
 async def me(acc: Account = Depends(current_account)):
-    return MeOut(account_id=acc.id, email=acc.email, name=acc.name, is_admin=is_admin(acc))
+    return MeOut(account_id=acc.id, email=acc.email, name=acc.name,
+                 is_admin=is_admin(acc), plan=acc.plan or "",
+                 plan_status=acc.plan_status or "")
 
 
 class ArchiveOut(BaseModel):

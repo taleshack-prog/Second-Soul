@@ -14,21 +14,54 @@ import time
 import uuid
 import zipfile
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import sessions
+from app.core.database import get_db
+from app.core.security import decode_token
+from app.models.account import Account, ArchiveLink, LinkStatus, Role
 
 router = APIRouter(prefix="/session", tags=["Sessão"])
 
 
+async def _optional_account(authorization: str, db: AsyncSession) -> Account | None:
+    """Resolve a conta do token, se houver. Nunca levanta: criar a essência
+    não exige login (o front é que obriga), mas SE a pessoa está logada a
+    essência já nasce vinculada a ela."""
+    if not authorization.lower().startswith("bearer "):
+        return None
+    try:
+        payload = decode_token(authorization[7:].strip())
+        return await db.get(Account, payload.get("sub", ""))
+    except Exception:
+        return None
+
+
 @router.post("/new")
-async def new_session():
+async def new_session(
+    authorization: str = Header(default=""),
+    db: AsyncSession = Depends(get_db),
+):
     """Cria uma essência vazia — a jornada começa por QUEM a pessoa é,
-    não por um arquivo. Importar conversas passa a ser uma opção do acervo."""
+    não por um arquivo. Importar conversas passa a ser uma opção do acervo.
+
+    Self-service: se quem cria está logado, a essência nasce com essa conta
+    como DONA (owner/ativo). O caminho do admin (vincular a essência de outra
+    pessoa a herdeiros) continua existindo em paralelo, no painel."""
     job_id = uuid.uuid4().hex[:12]
     sessions.session_dir(job_id, create=True)
+
+    acc = await _optional_account(authorization, db)
+    if acc is not None:
+        db.add(ArchiveLink(
+            account_id=acc.id, job_id=job_id,
+            role=Role.owner, status=LinkStatus.active,
+        ))
+        await db.commit()
+
     return {"job_id": job_id}
 
 

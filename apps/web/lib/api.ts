@@ -48,9 +48,12 @@ export async function fetchStages(): Promise<Stage[]> {
   return (await res.json()).stages ?? [];
 }
 
-/** Envia o arquivo; responde na hora com o id da tarefa. */
+/** Cria a essência. Se logado, nasce vinculada à conta (dono). */
 export async function newSession(): Promise<string> {
-  const res = await fetch(`${API}/api/v1/session/new`, { method: "POST" });
+  const res = await fetch(`${API}/api/v1/session/new`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
   if (!res.ok) await fail(res, "Não foi possível iniciar.");
   return (await res.json()).job_id;
 }
@@ -539,6 +542,8 @@ export type Account = {
   email: string;
   name: string;
   is_admin: boolean;
+  plan: string;        // "" | premium | heranca
+  plan_status: string; // "" | active | past_due | canceled
 };
 
 export type TokenResponse = Account & { token: string };
