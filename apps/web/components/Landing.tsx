@@ -216,6 +216,12 @@ function TopBar({ onJoin }: { onJoin: () => void }) {
       <span className="font-display text-xl tracking-tight text-ink">Second Soul</span>
       <div className="flex items-center gap-4">
         <a
+          href="/privacidade"
+          className="hidden text-sm text-muted transition-colors hover:text-ink sm:inline"
+        >
+          Privacidade
+        </a>
+        <a
           href="/entrar"
           className="text-sm text-muted transition-colors hover:text-ink"
         >
