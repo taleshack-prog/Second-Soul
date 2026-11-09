@@ -447,11 +447,17 @@ export async function getConsent(jobId: string): Promise<boolean> {
   }
 }
 
+/** Consentimento granular (LGPD): os três são obrigatórios. */
 export async function acceptConsent(jobId: string): Promise<void> {
   const res = await fetch(`${API}/api/v1/session/${jobId}/consent`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ accepted: true, version: "1.0" }),
+    body: JSON.stringify({
+      sensitive: true,
+      international: true,
+      ai: true,
+      version: "2.0",
+    }),
   });
   if (!res.ok) await fail(res, "Não foi possível registrar o consentimento.");
 }

@@ -78,8 +78,13 @@ async def get_recovery_email(job_id: str):
 # ---------------- consentimento ----------------
 
 class Consent(BaseModel):
-    accepted: bool
-    version: str = "1.0"
+    # consentimentos granulares (LGPD): cada um é uma base legal própria.
+    sensitive: bool = False       # art. 11 — dados sensíveis (saúde, crença, etc.)
+    international: bool = False    # art. 33 — transferência internacional (EUA)
+    ai: bool = False              # processamento por provedor de IA (Groq)
+    version: str = "2.0"
+    # compatibilidade com a versão antiga (aceite único)
+    accepted: bool = False
 
 
 @router.post("/{job_id}/consent")
@@ -88,12 +93,22 @@ async def record_consent(job_id: str, body: Consent):
 
     A LGPD exige base legal e prova de consentimento; guardar isso junto ao
     acervo torna o registro verificável pela própria pessoa."""
-    if not body.accepted:
-        raise HTTPException(422, "É preciso aceitar para continuar.")
+    # cada consentimento granular é obrigatório — a LGPD exige consentimento
+    # específico e destacado, não um aceite único em bloco.
+    if not (body.sensitive and body.international and body.ai):
+        raise HTTPException(
+            422, "É preciso consentir com os três itens para continuar."
+        )
     d = sessions.session_dir(job_id, create=True)
     (d / "consentimento.json").write_text(
-        json.dumps({"accepted": True, "version": body.version,
-                    "at": time.time()}, ensure_ascii=False),
+        json.dumps({
+            "sensitive": body.sensitive,
+            "international": body.international,
+            "ai": body.ai,
+            "accepted": True,  # os três marcados
+            "version": body.version,
+            "at": time.time(),
+        }, ensure_ascii=False),
         encoding="utf-8",
     )
     return {"recorded": True}

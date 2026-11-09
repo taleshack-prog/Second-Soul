@@ -1376,8 +1376,14 @@ function StepConsent({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sensitive, setSensitive] = useState(false);
+  const [international, setInternational] = useState(false);
+  const [ai, setAi] = useState(false);
+
+  const allChecked = sensitive && international && ai;
 
   async function accept() {
+    if (!allChecked) return;
     setBusy(true);
     setError(null);
     try {
@@ -1397,29 +1403,42 @@ function StepConsent({
         O que você guardar aqui é seu.
       </h1>
       <p className="mt-5 text-[17px] leading-relaxed text-muted">
-        Você está prestes a confiar memórias a este lugar. Antes disso, o que
-        precisa saber — sem letra miúda.
+        Você está prestes a confiar memórias a este lugar. Para começar,
+        precisamos do seu consentimento — em itens separados, como a lei pede.
       </p>
 
-      <ul className="mt-8 space-y-4 text-[15px] leading-relaxed text-muted">
-        <li className="rounded-xl border border-line bg-surface p-4">
-          Suas memórias ficam em servidores nos <b className="text-ink">Estados
-          Unidos</b>, e trechos delas são enviados a um provedor de IA para gerar
-          as conversas.
-        </li>
-        <li className="rounded-xl border border-line bg-surface p-4">
-          O <b className="text-ink">link do seu acervo é a chave</b> — não há
-          senha ainda. Quem tiver o link entra.
-        </li>
-        <li className="rounded-xl border border-line bg-surface p-4">
-          Você pode <b className="text-ink">levar tudo embora</b> ou{" "}
-          <b className="text-ink">apagar para sempre</b>, quando quiser.
-        </li>
-        <li className="rounded-xl border border-line bg-surface p-4">
-          Isto é uma <b className="text-ink">versão de testes</b>. Guarde os
-          originais com você — não use como único lugar do que é insubstituível.
-        </li>
-      </ul>
+      <div className="mt-8 space-y-3">
+        <ConsentCheck
+          checked={sensitive}
+          onChange={setSensitive}
+          title="Dados sensíveis"
+        >
+          Autorizo o tratamento dos dados sensíveis que minhas memórias possam
+          revelar — como saúde, crença, origem ou opiniões — para criar e manter
+          a essência. (LGPD, art. 11)
+        </ConsentCheck>
+
+        <ConsentCheck
+          checked={international}
+          onChange={setInternational}
+          title="Transferência internacional"
+        >
+          Entendo e autorizo que meus dados fiquem armazenados em servidores nos{" "}
+          <b className="text-ink">Estados Unidos</b>. (LGPD, art. 33)
+        </ConsentCheck>
+
+        <ConsentCheck checked={ai} onChange={setAi} title="Processamento por IA">
+          Autorizo que trechos das minhas memórias sejam enviados a um provedor
+          de inteligência artificial para gerar as conversas da essência.
+        </ConsentCheck>
+      </div>
+
+      <p className="mt-5 text-[13px] leading-relaxed text-muted">
+        Você pode, a qualquer momento, <b className="text-ink">levar tudo embora</b>{" "}
+        (exportar) ou <b className="text-ink">apagar para sempre</b>. Guarde os
+        originais com você — não use este como o único lugar do que é
+        insubstituível.
+      </p>
 
       {error && (
         <p className="mt-5 rounded-xl border border-soul/40 bg-soul/10 p-4 text-sm text-ink">
@@ -1427,17 +1446,52 @@ function StepConsent({
         </p>
       )}
 
-      <div className="mt-8 flex flex-wrap items-center gap-4">
-        <button onClick={accept} disabled={busy}
+      <div className="mt-6 flex flex-wrap items-center gap-4">
+        <button onClick={accept} disabled={busy || !allChecked}
           className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5 disabled:opacity-40">
-          {busy ? "Registrando…" : "Entendi e quero começar"}
+          {busy ? "Registrando…" : "Concordo e quero começar"}
         </button>
         <a href="/privacidade" target="_blank" rel="noopener noreferrer"
           className="text-sm text-muted underline underline-offset-4 hover:text-ink">
-          Ler a página de privacidade
+          Ler a política de privacidade
         </a>
       </div>
+      {!allChecked && (
+        <p className="mt-3 text-xs text-muted">
+          Marque os três itens para continuar.
+        </p>
+      )}
     </div>
+  );
+}
+
+function ConsentCheck({
+  checked,
+  onChange,
+  title,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer gap-3 rounded-xl border p-4 transition-colors ${
+        checked ? "border-soul/60 bg-surface" : "border-line bg-surface/60"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 h-4 w-4 shrink-0 accent-soul"
+      />
+      <span className="text-[14px] leading-relaxed text-muted">
+        <b className="text-soul">{title}.</b> {children}
+      </span>
+    </label>
   );
 }
 
