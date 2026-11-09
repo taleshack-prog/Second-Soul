@@ -255,12 +255,12 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
         // órbita ELÍPTICA: usa a largura (que sobra) para espalhar os cards,
         // e um raio vertical menor limitado pela altura. Assim a galáxia fica
         // grande no centro e as luas bem afastadas, mesmo em janela baixa.
-        const Rx = Math.min(w / 2 - 110, 560);
-        const Ry = Math.min(h / 2 - 90, 380, Rx * 0.85);
-        // galáxia dimensionada pela altura disponível — grande, mas cabendo
-        // dentro do anel das luas (que passam por cima nas pontas de cima/baixo).
+        const Rx = Math.min(w / 2 - 110, 580);
+        const Ry = Math.min(h / 2 - 78, 420, Rx * 0.9);
+        // galáxia GRANDE no centro. As luas se espalham pelos lados, então o
+        // centro fica livre; as pontas de cima/baixo apenas tangenciam o halo.
         if (galaxyRef.current) {
-          const d = Math.max(180, Math.min(Ry * 1.45, 520));
+          const d = Math.max(260, Math.min(Ry * 1.9, 640));
           galaxyRef.current.style.width = `${d}px`;
           galaxyRef.current.style.height = `${d}px`;
         }
@@ -294,11 +294,13 @@ function Orbital({ onOpen }: { onOpen: (id: string) => void }) {
           ref={galaxyRef}
           className="bg-cover bg-center"
           style={{
-            width: "280px",
-            height: "280px",
+            width: "420px",
+            height: "420px",
             backgroundImage: "url(/galaxy.webp)",
-            WebkitMaskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
-            maskImage: "radial-gradient(circle, #000 55%, transparent 74%)",
+            // revela quase a galáxia inteira (fade só na borda) — antes a
+            // máscara escondia ~45% e a fazia parecer pequena.
+            WebkitMaskImage: "radial-gradient(circle, #000 70%, transparent 92%)",
+            maskImage: "radial-gradient(circle, #000 70%, transparent 92%)",
             animation: "spin-slow 170s linear infinite",
           }}
         />
