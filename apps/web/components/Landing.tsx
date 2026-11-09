@@ -214,12 +214,20 @@ function TopBar({ onJoin }: { onJoin: () => void }) {
   return (
     <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
       <span className="font-display text-xl tracking-tight text-ink">Second Soul</span>
-      <button
-        onClick={onJoin}
-        className="rounded-full bg-soul px-4 py-2 text-sm font-medium text-[#241703] transition hover:brightness-110"
-      >
-        Entrar na lista
-      </button>
+      <div className="flex items-center gap-4">
+        <a
+          href="/entrar"
+          className="text-sm text-muted transition-colors hover:text-ink"
+        >
+          Entrar
+        </a>
+        <button
+          onClick={onJoin}
+          className="rounded-full bg-soul px-4 py-2 text-sm font-medium text-[#241703] transition hover:brightness-110"
+        >
+          Entrar na lista
+        </button>
+      </div>
     </header>
   );
 }
