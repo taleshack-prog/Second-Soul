@@ -173,7 +173,7 @@ export default function LandingPage() {
           {active === "waitlist" ? (
             <WaitlistPanel />
           ) : active === "planos" ? (
-            <PlansPanel loggedIn={loggedIn} onJoin={() => setActive("waitlist")} />
+            <PlansPanel loggedIn={loggedIn} />
           ) : (
             <MoonPanel moon={MOONS.find((m) => m.id === active)!} />
           )}
@@ -443,7 +443,7 @@ function MoonPanel({ moon }: { moon: Moon }) {
   );
 }
 
-function PlansPanel({ loggedIn, onJoin }: { loggedIn: boolean; onJoin: () => void }) {
+function PlansPanel({ loggedIn }: { loggedIn: boolean }) {
   const [busy, setBusy] = useState<string>("");
   const [err, setErr] = useState("");
 
@@ -526,12 +526,17 @@ function PlansPanel({ loggedIn, onJoin }: { loggedIn: boolean; onJoin: () => voi
       {err && <p className="mt-3 text-sm text-soul">{err}</p>}
 
       {!loggedIn && (
-        <button
-          onClick={onJoin}
-          className="mt-5 w-full rounded-full bg-soul px-4 py-2.5 text-sm font-medium text-[#241703] transition hover:brightness-110"
-        >
-          Entrar na lista de espera
-        </button>
+        <>
+          <a
+            href="/entrar"
+            className="mt-5 block w-full rounded-full bg-soul px-4 py-2.5 text-center text-sm font-medium text-[#241703] transition hover:brightness-110"
+          >
+            Criar conta para assinar
+          </a>
+          <p className="mt-2 text-center text-xs text-muted">
+            Você cria a conta e escolhe o plano em seguida.
+          </p>
+        </>
       )}
     </div>
   );
