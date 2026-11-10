@@ -160,7 +160,7 @@ export default function LandingPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-base text-ink">
       <Starfield />
-      <TopBar onJoin={() => setActive("waitlist")} />
+      <TopBar />
 
       {mode === "orbital" ? (
         <Orbital onOpen={setActive} />
@@ -210,7 +210,7 @@ function Starfield() {
 
 /* ---------------- barra superior ---------------- */
 
-function TopBar({ onJoin }: { onJoin: () => void }) {
+function TopBar() {
   return (
     <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
       <span className="font-display text-xl tracking-tight text-ink">Second Soul</span>
@@ -227,12 +227,6 @@ function TopBar({ onJoin }: { onJoin: () => void }) {
         >
           Entrar
         </a>
-        <button
-          onClick={onJoin}
-          className="rounded-full bg-soul px-4 py-2 text-sm font-medium text-[#241703] transition hover:brightness-110"
-        >
-          Entrar na lista
-        </button>
       </div>
     </header>
   );
