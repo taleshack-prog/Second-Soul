@@ -1,6 +1,7 @@
 export const metadata = {
-  title: "Privacidade — Second Soul",
+  title: "Privacidade",
   description: "O que guardamos, por quê, e como você controla.",
+  alternates: { canonical: "/privacidade" },
 };
 
 function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
