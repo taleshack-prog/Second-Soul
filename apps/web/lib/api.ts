@@ -71,6 +71,7 @@ export async function startImport(
 
   const res = await fetch(`${API}/api/v1/import/upload`, {
     method: "POST",
+    headers: authHeaders(),
     body: form,
   });
   if (!res.ok) await fail(res, "Não foi possível enviar esse arquivo.");
@@ -78,7 +79,9 @@ export async function startImport(
 }
 
 export async function getStatus(jobId: string): Promise<JobStatus> {
-  const res = await fetch(`${API}/api/v1/import/status/${jobId}`);
+  const res = await fetch(`${API}/api/v1/import/status/${jobId}`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) await fail(res, "Perdemos o acompanhamento dessa importação.");
   return res.json();
 }
@@ -158,7 +161,9 @@ export type VoicePreview = {
 };
 
 export async function fetchThemes(jobId: string): Promise<Theme[]> {
-  const res = await fetch(`${API}/api/v1/voices/themes/${jobId}`);
+  const res = await fetch(`${API}/api/v1/voices/themes/${jobId}`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) await fail(res, "Não conseguimos analisar o acervo.");
   return (await res.json()).themes ?? [];
 }
@@ -170,7 +175,7 @@ export async function previewVoice(
 ): Promise<VoicePreview> {
   const res = await fetch(`${API}/api/v1/voices/preview`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ job_id: jobId, terms, threshold }),
   });
   if (!res.ok) await fail(res, "Não foi possível filtrar com esses termos.");
@@ -185,7 +190,7 @@ export async function saveVoice(
 ): Promise<number> {
   const res = await fetch(`${API}/api/v1/voices/save`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       job_id: jobId,
       terms,
@@ -215,7 +220,9 @@ export async function fetchProfileFields(): Promise<ProfileField[]> {
 export async function fetchProfile(
   jobId: string
 ): Promise<{ name: string; fields: Record<string, string> } | null> {
-  const res = await fetch(`${API}/api/v1/profile/${jobId}`);
+  const res = await fetch(`${API}/api/v1/profile/${jobId}`, {
+    headers: authHeaders(),
+  });
   if (res.status === 404) return null; // ainda não preenchido
   if (!res.ok) return null;
   return res.json();
@@ -228,7 +235,7 @@ export async function saveProfile(
 ): Promise<number> {
   const res = await fetch(`${API}/api/v1/profile/${jobId}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ name, fields }),
   });
   if (!res.ok) await fail(res, "Não foi possível salvar o perfil.");
@@ -356,7 +363,7 @@ export async function addTextMemory(
 ): Promise<{ words: number; title: string }> {
   const res = await fetch(`${API}/api/v1/memories/${jobId}/text`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ title, content, genre }),
   });
   if (!res.ok) await fail(res, "Não foi possível guardar essa memória.");
@@ -377,6 +384,7 @@ export async function addFileMemory(
   form.append("genre", genre);
   const res = await fetch(`${API}/api/v1/memories/${jobId}/upload`, {
     method: "POST",
+    headers: authHeaders(),
     body: form,
   });
   if (!res.ok) await fail(res, "Não foi possível guardar esse arquivo.");
@@ -425,7 +433,7 @@ export async function editMemory(
   if (genre !== undefined) body.genre = genre;
   const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) await fail(res, "Não foi possível salvar a correção.");
@@ -434,6 +442,7 @@ export async function editMemory(
 export async function deleteMemory(jobId: string, pieceId: string): Promise<void> {
   const res = await fetch(`${API}/api/v1/memories/${jobId}/item/${pieceId}`, {
     method: "DELETE",
+    headers: authHeaders(),
   });
   if (!res.ok) await fail(res, "Não foi possível excluir essa memória.");
 }
@@ -442,7 +451,9 @@ export async function deleteMemory(jobId: string, pieceId: string): Promise<void
 
 export async function getConsent(jobId: string): Promise<boolean> {
   try {
-    const res = await fetch(`${API}/api/v1/session/${jobId}/consent`);
+    const res = await fetch(`${API}/api/v1/session/${jobId}/consent`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return false;
     return (await res.json()).accepted === true;
   } catch {
@@ -454,7 +465,7 @@ export async function getConsent(jobId: string): Promise<boolean> {
 export async function acceptConsent(jobId: string): Promise<void> {
   const res = await fetch(`${API}/api/v1/session/${jobId}/consent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       sensitive: true,
       international: true,
@@ -465,14 +476,31 @@ export async function acceptConsent(jobId: string): Promise<void> {
   if (!res.ok) await fail(res, "Não foi possível registrar o consentimento.");
 }
 
-export function exportUrl(jobId: string): string {
-  return `${API}/api/v1/session/${jobId}/export`;
+/**
+ * Baixa o acervo inteiro (.zip). A rota exige o token do dono, e um <a href>
+ * não carrega o header Authorization — por isso baixa via fetch e dispara o
+ * download pelo próprio navegador.
+ */
+export async function downloadExport(jobId: string): Promise<void> {
+  const res = await fetch(`${API}/api/v1/session/${jobId}/export`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) await fail(res, "Não foi possível exportar os dados.");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `second-soul-${jobId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function deleteSession(jobId: string): Promise<void> {
   const res = await fetch(
     `${API}/api/v1/session/${jobId}?confirm=APAGAR`,
-    { method: "DELETE" }
+    { method: "DELETE", headers: authHeaders() }
   );
   if (!res.ok) await fail(res, "Não foi possível apagar.");
 }
@@ -485,7 +513,7 @@ export async function setRecoveryEmail(
 ): Promise<void> {
   const res = await fetch(`${API}/api/v1/session/${jobId}/email`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ email }),
   });
   if (!res.ok) await fail(res, "Não foi possível guardar o e-mail.");
@@ -493,7 +521,9 @@ export async function setRecoveryEmail(
 
 export async function getRecoveryEmail(jobId: string): Promise<string> {
   try {
-    const res = await fetch(`${API}/api/v1/session/${jobId}/email`);
+    const res = await fetch(`${API}/api/v1/session/${jobId}/email`, {
+      headers: authHeaders(),
+    });
     if (!res.ok) return "";
     return (await res.json()).email || "";
   } catch {
@@ -555,6 +585,8 @@ export type MyArchive = {
   can_reinvite: boolean;
   person_name: string;
   twin_ready: boolean;
+  memories: number;
+  updated_at: string | null;
 };
 
 export type AdminLink = {

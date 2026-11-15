@@ -36,7 +36,7 @@ import {
   acceptConsent,
   setRecoveryEmail,
   getRecoveryEmail,
-  exportUrl,
+  downloadExport,
   deleteSession,
 } from "@/lib/api";
 
@@ -887,17 +887,18 @@ function StepDone({
         <>
           <p className="mt-4 text-sm text-muted">
             {(ready.memories ?? 0).toLocaleString("pt-BR")} memórias sustentam
-            esta conversa.{" "}
-            <button onClick={onEditProfile}
-              className="text-soul underline underline-offset-4 hover:opacity-80">
-              Revisar o perfil
-            </button>
-            {" · "}
+            esta conversa.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <button onClick={onAddMemories}
-              className="text-soul underline underline-offset-4 hover:opacity-80">
+              className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5">
               Acrescentar memórias
             </button>
-          </p>
+            <button onClick={onEditProfile}
+              className="rounded-full bg-soul px-6 py-3 font-medium text-[#241703] transition-transform hover:-translate-y-0.5">
+              Revisar o perfil
+            </button>
+          </div>
           {jobId && <DataRights jobId={jobId} />}
           <p className="hidden">
           </p>
@@ -1502,6 +1503,20 @@ function ConsentCheck({
 function DataRights({ jobId }: { jobId: string }) {
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function exportar() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await downloadExport(jobId);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Não foi possível exportar.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function remove() {
     try {
@@ -1525,10 +1540,10 @@ function DataRights({ jobId }: { jobId: string }) {
 
   return (
     <div className="mt-4 text-sm text-muted">
-      <a href={exportUrl(jobId)}
-        className="underline underline-offset-4 hover:text-ink">
-        Levar meus dados
-      </a>
+      <button onClick={exportar} disabled={exporting}
+        className="underline underline-offset-4 hover:text-ink disabled:opacity-50">
+        {exporting ? "Preparando…" : "Levar meus dados"}
+      </button>
       {" · "}
       {confirming ? (
         <span className="text-ink">
@@ -1552,6 +1567,7 @@ function DataRights({ jobId }: { jobId: string }) {
         className="underline underline-offset-4 hover:text-ink">
         Privacidade
       </a>
+      {exportError && <p className="mt-2 text-sm text-soul">{exportError}</p>}
     </div>
   );
 }

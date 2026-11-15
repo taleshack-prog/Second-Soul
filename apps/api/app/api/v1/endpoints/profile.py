@@ -16,7 +16,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from app.api.v1.endpoints.auth import archive_owner
 from app.core import sessions
 from pydantic import BaseModel
 
@@ -43,7 +44,7 @@ class ProfileIn(BaseModel):
     fields: dict[str, str] = {}
 
 
-@router.post("/{job_id}")
+@router.post("/{job_id}", dependencies=[Depends(archive_owner)])
 async def save_profile(job_id: str, body: ProfileIn, background: BackgroundTasks):
     d = _session_dir(job_id)
     if not d.exists():
@@ -59,8 +60,9 @@ async def save_profile(job_id: str, body: ProfileIn, background: BackgroundTasks
     return {"saved": True, "filled_fields": filled}
 
 
-@router.get("/{job_id}")
+@router.get("/{job_id}", dependencies=[Depends(archive_owner)])
 async def get_profile(job_id: str):
+    """Perfil declarado inteiro — matéria-prima, só o dono (e o admin) lê."""
     f = _session_dir(job_id) / "perfil.json"
     if not f.exists():
         raise HTTPException(404, "Perfil ainda não preenchido nesta sessão.")

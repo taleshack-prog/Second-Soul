@@ -11,9 +11,13 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.endpoints.auth import archive_owner, current_account, require_owner
 from app.core.config import settings
+from app.core.database import get_db
+from app.models.account import Account, ArchiveLink, LinkStatus, Role
 from app.schemas.import_data import ImportPreviewItem, ImportResult, JobAccepted, JobStatus
 from app.services.jobs import STAGES, store
 from app.core import sessions
@@ -36,7 +40,15 @@ async def upload(
     file: UploadFile = File(...),
     pii_level: str = Form("strict"),
     job_id: str = Form(""),
+    acc: Account = Depends(current_account),
+    db: AsyncSession = Depends(get_db),
 ):
+    # sempre exige conta: sem ela qualquer um gravava arquivo no volume.
+    # importar PARA DENTRO de uma essência existente reescreve o acervo dela:
+    # só o dono.
+    if job_id.strip():
+        await require_owner(job_id.strip(), acc, db)
+
     if pii_level not in _PII_LEVELS:
         raise HTTPException(422, f"pii_level inválido. Use: {sorted(_PII_LEVELS)}")
 
@@ -61,12 +73,22 @@ async def upload(
     # se a sessão já existe (fluxo perfil->acervo), importa para dentro dela
     existing = job_id.strip()
     job_id = store.create(original, job_id=existing or None)
+    if not existing:
+        # sessão nova nasce com a conta logada como DONA, como em /session/new —
+        # sem isso o acervo ficava sem dono e o próprio /status recusava.
+        db.add(ArchiveLink(
+            account_id=acc.id, job_id=job_id,
+            role=Role.owner, status=LinkStatus.active,
+        ))
+        await db.commit()
     background.add_task(_process, job_id, tmp.name, pii_level, original)
     return JobAccepted(job_id=job_id, file=original)
 
 
-@router.get("/status/{job_id}", response_model=JobStatus)
+@router.get("/status/{job_id}", response_model=JobStatus,
+            dependencies=[Depends(archive_owner)])
 async def status(job_id: str):
+    """Etapa atual e, ao fim, amostra de mensagens cruas: só o dono."""
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Tarefa não encontrada (pode ter expirado).")

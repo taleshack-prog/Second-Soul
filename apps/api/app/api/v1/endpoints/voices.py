@@ -18,9 +18,14 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from app.core import sessions
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.v1.endpoints.auth import archive_owner, current_account, require_owner
+from app.core import sessions
+from app.core.database import get_db
+from app.models.account import Account
 
 router = APIRouter(prefix="/voices", tags=["Separação de vozes"])
 
@@ -50,9 +55,11 @@ def _load_user_rows(job_id: str) -> list[dict]:
     return rows
 
 
-@router.get("/themes/{job_id}")
+@router.get("/themes/{job_id}", dependencies=[Depends(archive_owner)])
 async def themes(job_id: str, n: int = 24):
-    """Temas dominantes do acervo — o 'empurrão' automático das sugestões."""
+    """Temas dominantes do acervo — o 'empurrão' automático das sugestões.
+
+    Lê o acervo cru: só o dono (tela de separação de vozes)."""
     rows = _load_user_rows(job_id)
     counter: Counter[str] = Counter()
     for r in rows:
@@ -77,8 +84,16 @@ class PreviewIn(BaseModel):
 
 
 @router.post("/preview")
-async def preview(body: PreviewIn):
-    """Termômetro ao vivo: com estes termos e este corte, o que entra?"""
+async def preview(
+    body: PreviewIn,
+    acc: Account = Depends(current_account),
+    db: AsyncSession = Depends(get_db),
+):
+    """Termômetro ao vivo: com estes termos e este corte, o que entra?
+
+    Devolve trechos do acervo cru: só o dono (job_id vem no corpo, por isso
+    a checagem é feita aqui, como em /voices/save)."""
+    await require_owner(body.job_id, acc, db)
     rows = _load_user_rows(body.job_id)
     kept_idx, scores = _score(rows, body.terms, body.threshold)
 
@@ -108,11 +123,20 @@ class SaveIn(PreviewIn):
 
 
 @router.post("/save")
-async def save(body: SaveIn, background: BackgroundTasks):
+async def save(
+    body: SaveIn,
+    background: BackgroundTasks,
+    acc: Account = Depends(current_account),
+    db: AsyncSession = Depends(get_db),
+):
     """Grava a essência escolhida e já dispara a indexação do gêmeo.
 
     Decisão de produto: o índice (SBERT) é construído AQUI, em segundo plano,
-    para que a conversa — o momento emocional — abra sem fricção depois."""
+    para que a conversa — o momento emocional — abra sem fricção depois.
+
+    Escreve a essência: só o dono (job_id vem no corpo, por isso a checagem
+    é feita aqui e não pela dependência archive_owner)."""
+    await require_owner(body.job_id, acc, db)
     rows = _load_user_rows(body.job_id)
     kept_idx, _ = _score(rows, body.terms, body.threshold)
     kept = [rows[i] for i in kept_idx]

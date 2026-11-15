@@ -20,10 +20,11 @@ import time
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from app.api.v1.endpoints.auth import archive_owner
 from app.core import sessions
 from app.core.config import settings
 
@@ -148,7 +149,7 @@ class TextMemory(BaseModel):
     genre: str = Field(default="vivido")  # "vivido" | "ficcao"
 
 
-@router.post("/{job_id}/text")
+@router.post("/{job_id}/text", dependencies=[Depends(archive_owner)])
 async def add_text(job_id: str, body: TextMemory, background: BackgroundTasks):
     """Uma crônica, uma história de família, uma decisão que quis registrar."""
     title = body.title.strip() or "Memória escrita"
@@ -167,7 +168,7 @@ async def add_text(job_id: str, body: TextMemory, background: BackgroundTasks):
 
 # ---------------- arquivo (texto, áudio, vídeo, imagem) ----------------
 
-@router.post("/{job_id}/upload")
+@router.post("/{job_id}/upload", dependencies=[Depends(archive_owner)])
 async def add_file(
     job_id: str,
     background: BackgroundTasks,
@@ -378,7 +379,7 @@ class EditItem(BaseModel):
     genre: str | None = Field(default=None)  # "vivido" | "ficcao" | None (mantém)
 
 
-@router.patch("/{job_id}/item/{piece_id}")
+@router.patch("/{job_id}/item/{piece_id}", dependencies=[Depends(archive_owner)])
 async def edit_item(job_id: str, piece_id: str, body: EditItem,
                     background: BackgroundTasks):
     """Corrige o título e/ou o texto de uma memória, nos dois lados (acervo +
@@ -441,7 +442,7 @@ async def edit_item(job_id: str, piece_id: str, body: EditItem,
     return {"saved": True, "id": piece_id, "title": new_title}
 
 
-@router.delete("/{job_id}/item/{piece_id}")
+@router.delete("/{job_id}/item/{piece_id}", dependencies=[Depends(archive_owner)])
 async def delete_item(job_id: str, piece_id: str, background: BackgroundTasks):
     """Remove uma memória por inteiro: a peça, a linha da essência e, se for
     imagem, o arquivo. O gêmeo deixa de conhecê-la."""

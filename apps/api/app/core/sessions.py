@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +75,19 @@ def state(job_id: str) -> dict[str, Any]:
     else:
         step = 1
 
+    # última escrita = mtime mais recente entre os arquivos da sessão
+    mtimes: list[float] = []
+    for fname in ("acervo.jsonl", "essencia.jsonl", "perfil.json", "pessoa.json"):
+        try:
+            mtimes.append((d / fname).stat().st_mtime)
+        except OSError:
+            pass
+    updated_at = (
+        datetime.fromtimestamp(max(mtimes), tz=timezone.utc).isoformat()
+        if mtimes
+        else None
+    )
+
     return {
         "found": True,
         "job_id": job_id,
@@ -84,6 +98,7 @@ def state(job_id: str) -> dict[str, Any]:
         "twin_ready": has_index,
         "person_name": person.get("name", ""),
         "memories": person.get("kept", 0),
+        "updated_at": updated_at,
     }
 
 

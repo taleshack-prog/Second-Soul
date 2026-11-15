@@ -18,6 +18,22 @@ const PAPEL: Record<string, string> = {
   executor: "Testamenteiro",
 };
 
+function memoriasTexto(n: number): string {
+  if (!n) return "nenhuma memória ainda";
+  return n === 1 ? "1 memória" : `${n.toLocaleString("pt-BR")} memórias`;
+}
+
+function dataTexto(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export default function MeusAcervosPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -128,28 +144,36 @@ export default function MeusAcervosPage() {
                 </p>
                 <p className="text-xs text-muted mt-0.5">
                   {PAPEL[a.role] ?? a.role}
+                  {` · ${memoriasTexto(a.memories)}`}
+                  {dataTexto(a.updated_at) &&
+                    ` · última escrita em ${dataTexto(a.updated_at)}`}
                   {a.status === "dormant" && " · aguardando liberação"}
                 </p>
               </div>
-              {a.twin_ready && a.status !== "dormant" ? (
-                <Link
-                  href={`/essencia/${a.job_id}`}
-                  className="shrink-0 rounded-lg bg-soul text-base text-sm font-medium px-4 py-2 hover:brightness-110 transition"
-                >
-                  Conversar
-                </Link>
-              ) : a.role === "owner" && a.status !== "dormant" ? (
-                <Link
-                  href={`/s/${a.job_id}`}
-                  className="shrink-0 rounded-lg border border-line text-ink text-sm font-medium px-4 py-2 hover:border-soul transition"
-                >
-                  Continuar
-                </Link>
-              ) : (
-                <span className="shrink-0 text-xs text-muted">
-                  {a.status === "dormant" ? "bloqueado" : "em construção"}
-                </span>
-              )}
+              <div className="shrink-0 flex items-center gap-2">
+                {a.role === "owner" && a.status !== "dormant" && (
+                  <Link
+                    href={`/s/${a.job_id}`}
+                    className="rounded-lg bg-soul text-base text-sm font-medium px-4 py-2 hover:brightness-110 transition"
+                  >
+                    Continuar escrevendo
+                  </Link>
+                )}
+                {a.twin_ready && a.status !== "dormant" && (
+                  <Link
+                    href={`/essencia/${a.job_id}`}
+                    className="rounded-lg border border-line text-ink text-sm font-medium px-4 py-2 hover:border-soul transition"
+                  >
+                    Conversar
+                  </Link>
+                )}
+                {a.status === "dormant" && (
+                  <span className="text-xs text-muted">bloqueado</span>
+                )}
+                {a.status !== "dormant" && !a.twin_ready && a.role !== "owner" && (
+                  <span className="text-xs text-muted">em construção</span>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { me } from "@/lib/api";
+import { me, myArchives } from "@/lib/api";
 import OnboardingWizard from "@/components/OnboardingWizard";
 
 // Criar/editar a essência. Exige login e plano ativo (sem freemium).
@@ -13,7 +13,7 @@ export default function Page() {
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    me().then((acc) => {
+    me().then(async (acc) => {
       if (!acc) {
         router.replace("/entrar");
         return;
@@ -22,6 +22,19 @@ export default function Page() {
         // sem plano: manda escolher um (o funil vive em /meus-acervos)
         router.replace("/meus-acervos");
         return;
+      }
+      if (!acc.is_admin) {
+        // já é dono de um acervo: volta a escrever nele, não cria outro.
+        // Com mais de um (duplicata), vai para o primeiro — limpeza é manual.
+        try {
+          const owned = (await myArchives()).find((a) => a.role === "owner");
+          if (owned) {
+            router.replace(`/s/${owned.job_id}`);
+            return;
+          }
+        } catch {
+          /* falhou ao listar: segue para criar, como antes */
+        }
       }
       setOk(true);
     });

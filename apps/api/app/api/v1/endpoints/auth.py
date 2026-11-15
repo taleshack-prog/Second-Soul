@@ -19,7 +19,7 @@ from app.core import sessions
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import create_access_token, decode_token, hash_password, verify_password
-from app.models.account import Account, ArchiveLink, LinkStatus
+from app.models.account import Account, ArchiveLink, LinkStatus, Role
 
 router = APIRouter(prefix="/auth", tags=["Contas"])
 
@@ -86,10 +86,6 @@ async def archive_access(
       - sem vínculo -> 403 (não revela se o acervo existe);
       - vínculo adormecido (herdeiro antes da liberação) -> 403;
       - vínculo ativo -> devolve o vínculo (o papel vem junto).
-
-    Ainda NÃO está acoplada aos endpoints de leitura — isso é a etapa 2.3,
-    quando o front já manda o token. Fica pronta aqui para não reescrever
-    depois.
     """
     link = await db.scalar(
         select(ArchiveLink).where(
@@ -103,6 +99,37 @@ async def archive_access(
     if link.status == LinkStatus.dormant:
         raise HTTPException(403, "Este acervo ainda não foi liberado.")
     return link
+
+
+async def require_owner(
+    job_id: str, acc: Account, db: AsyncSession
+) -> ArchiveLink | None:
+    """A conta pode ESCREVER neste acervo? Só o dono (e o admin).
+
+    Usa archive_access e acrescenta a exigência do papel:
+      - admin passa sempre (com ou sem vínculo; archive_access devolve None
+        para admin sem vínculo explícito);
+      - vínculo de dono ativo -> passa;
+      - qualquer outro papel (convidado, herdeiro, testamenteiro) -> 403.
+
+    Função comum para as rotas cujo job_id vem no corpo ou no formulário;
+    as rotas com {job_id} no caminho usam a dependência archive_owner.
+    """
+    link = await archive_access(job_id, acc, db)
+    if link is None or is_admin(acc):
+        return link
+    if link.role != Role.owner:
+        raise HTTPException(403, "Só o dono pode alterar este acervo.")
+    return link
+
+
+async def archive_owner(
+    job_id: str,
+    acc: Account = Depends(current_account),
+    db: AsyncSession = Depends(get_db),
+) -> ArchiveLink | None:
+    """Dependência: exige que a conta seja dona do acervo do caminho."""
+    return await require_owner(job_id, acc, db)
 
 
 @router.post("/register", response_model=TokenOut)
@@ -155,6 +182,8 @@ class ArchiveOut(BaseModel):
     can_reinvite: bool
     person_name: str
     twin_ready: bool
+    memories: int = 0
+    updated_at: str | None = None
 
 
 @router.get("/me/archives", response_model=list[ArchiveOut])
@@ -178,5 +207,7 @@ async def my_archives(
             can_reinvite=lk.can_reinvite,
             person_name=st.get("person_name", "") if st.get("found") else "",
             twin_ready=bool(st.get("twin_ready")) if st.get("found") else False,
+            memories=int(st.get("memories") or 0) if st.get("found") else 0,
+            updated_at=st.get("updated_at") if st.get("found") else None,
         ))
     return out
