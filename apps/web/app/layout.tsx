@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import "./globals.css";
 import { SITE_URL } from "@/lib/seo";
+import PwaRegister from "@/components/PwaRegister";
+import InstallPrompt from "@/components/InstallPrompt";
 
 const display = Fraunces({
   subsets: ["latin"],
@@ -34,6 +36,23 @@ export const metadata: Metadata = {
     title: "Second Soul — Preserve uma essência",
     description: DESCRIPTION,
   },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Second Soul",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0811",
+  colorScheme: "dark",
 };
 
 // JSON-LD de identidade do site (Organization + WebSite), lido pelo Google e
@@ -77,6 +96,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(SITE_JSONLD) }}
         />
         {children}
+        <PwaRegister />
+        <InstallPrompt />
       </body>
     </html>
   );
