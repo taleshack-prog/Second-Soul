@@ -613,6 +613,9 @@ export type AdminArchive = {
   links: AdminLink[];
 };
 
+/** O e-mail já tem conta: o certo é entrar, não cadastrar de novo. */
+export class EmailTakenError extends Error {}
+
 export async function register(
   email: string,
   password: string,
@@ -623,6 +626,9 @@ export async function register(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, name }),
   });
+  if (res.status === 409) {
+    throw new EmailTakenError("Esse e-mail já tem conta. Digite a sua senha para entrar.");
+  }
   if (!res.ok) await fail(res, "Não foi possível criar a conta.");
   const data = (await res.json()) as TokenResponse;
   setToken(data.token);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, register, me } from "@/lib/api";
+import { login, register, me, EmailTakenError } from "@/lib/api";
 
 type Mode = "login" | "register";
 
@@ -15,6 +15,17 @@ export default function EntrarPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(true);
+  const [notice, setNotice] = useState("");
+
+  // /entrar?modo=criar abre direto no cadastro (botão "Criar conta para assinar")
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("modo") === "criar") setMode("register");
+    } catch {
+      /* mantém login */
+    }
+  }, []);
 
   // já logado? manda para onde faz sentido (admin vê o painel)
   useEffect(() => {
@@ -27,6 +38,7 @@ export default function EntrarPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setNotice("");
     setBusy(true);
     try {
       const acc =
@@ -35,7 +47,14 @@ export default function EntrarPage() {
           : await register(email.trim().toLowerCase(), password, name.trim());
       router.replace(acc.is_admin ? "/admin" : "/meus-acervos");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Algo deu errado.");
+      if (err instanceof EmailTakenError) {
+        // a conta já existe (ex.: cadastrou e não comprou): vira login com o mesmo e-mail
+        setMode("login");
+        setPassword("");
+        setNotice(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Algo deu errado.");
+      }
       setBusy(false);
     }
   }
@@ -88,6 +107,12 @@ export default function EntrarPage() {
             required
           />
 
+          {notice && (
+            <p className="text-sm text-ink bg-surface2 border border-soul/40 rounded-lg px-3 py-2">
+              {notice}
+            </p>
+          )}
+
           {error && (
             <p className="text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-lg px-3 py-2">
               {error}
@@ -113,6 +138,7 @@ export default function EntrarPage() {
             onClick={() => {
               setMode(mode === "login" ? "register" : "login");
               setError("");
+              setNotice("");
             }}
             className="text-soul underline underline-offset-2"
           >
