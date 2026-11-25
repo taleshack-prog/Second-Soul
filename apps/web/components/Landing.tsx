@@ -528,13 +528,16 @@ function PlansPanel({ loggedIn }: { loggedIn: boolean }) {
       {!loggedIn && (
         <>
           <a
-            href="/entrar"
+            href="/entrar?modo=criar"
             className="mt-5 block w-full rounded-full bg-soul px-4 py-2.5 text-center text-sm font-medium text-[#241703] transition hover:brightness-110"
           >
             Criar conta para assinar
           </a>
           <p className="mt-2 text-center text-xs text-muted">
-            Você cria a conta e escolhe o plano em seguida.
+            Você cria a conta e escolhe o plano em seguida.{" "}
+            <a href="/entrar" className="text-soul underline underline-offset-2">
+              Já tenho conta
+            </a>
           </p>
         </>
       )}
