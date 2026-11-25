@@ -248,11 +248,17 @@ export async function saveProfile(
 export async function startCheckout(
   plan: "premium_month" | "premium_year" | "heranca"
 ): Promise<void> {
-  const res = await fetch(`${API}/api/v1/billing/checkout`, {
-    method: "POST",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ plan }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API}/api/v1/billing/checkout`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ plan }),
+    });
+  } catch {
+    // erro de rede/CORS: o navegador só diz "Failed to fetch"
+    throw new Error("Sem conexão com o pagamento agora. Verifique a internet e tente de novo.");
+  }
   if (!res.ok) await fail(res, "Não foi possível iniciar o pagamento.");
   const data = (await res.json()) as { url: string };
   window.location.href = data.url;

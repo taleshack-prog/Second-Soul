@@ -14,6 +14,7 @@ loop async. Nada funciona sem STRIPE_SECRET_KEY definido no ambiente.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 import stripe
@@ -27,6 +28,8 @@ from app.api.v1.endpoints.auth import current_account
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.account import Account
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["Cobrança"])
 
@@ -82,6 +85,28 @@ class CheckoutIn(BaseModel):
     plan: str  # premium_month | premium_year | heranca
 
 
+def _create_customer_sync(acc: Account) -> str:
+    customer = stripe.Customer.create(
+        email=acc.email, name=acc.name or None,
+        metadata={"account_id": acc.id},
+    )
+    return customer.id
+
+
+def _customer_exists_sync(customer_id: str) -> bool:
+    """Confere se o cliente existe NESTA chave do Stripe.
+
+    Contas criadas quando o site usava a chave de teste guardam um cus_ de
+    teste; com a chave live o Stripe responde "No such customer" e o checkout
+    quebrava com 500 (sem cabeçalho CORS -> "Failed to fetch" no navegador).
+    """
+    try:
+        c = stripe.Customer.retrieve(customer_id)
+    except stripe.InvalidRequestError:
+        return False
+    return not getattr(c, "deleted", False)
+
+
 @router.post("/checkout")
 async def checkout(body: CheckoutIn, acc: Account = Depends(current_account),
                    db: AsyncSession = Depends(get_db)):
@@ -90,35 +115,41 @@ async def checkout(body: CheckoutIn, acc: Account = Depends(current_account),
         raise HTTPException(422, "Plano inválido.")
     spec = _PLANS[body.plan]
 
-    # garante um cliente Stripe para a conta
-    if not acc.stripe_customer_id:
-        customer = await run_in_threadpool(
-            lambda: stripe.Customer.create(
-                email=acc.email, name=acc.name or None,
-                metadata={"account_id": acc.id},
+    try:
+        # garante um cliente Stripe válido para a conta (recria se o id salvo
+        # for de outro modo/conta do Stripe, ex.: teste -> live)
+        if not acc.stripe_customer_id or not await run_in_threadpool(
+            _customer_exists_sync, acc.stripe_customer_id
+        ):
+            acc.stripe_customer_id = await run_in_threadpool(_create_customer_sync, acc)
+            await db.commit()
+
+        price_id = await run_in_threadpool(_resolve_price_sync, body.plan)
+
+        front = (settings.FRONTEND_URL or "").rstrip("/")
+        session = await run_in_threadpool(
+            lambda: stripe.checkout.Session.create(
+                customer=acc.stripe_customer_id,
+                mode=spec["mode"],
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=f"{front}/meus-acervos?assinatura=ok",
+                cancel_url=f"{front}/lp",
+                metadata={"account_id": acc.id, "plan": body.plan},
+                subscription_data=(
+                    {"metadata": {"account_id": acc.id}}
+                    if spec["mode"] == "subscription" else None
+                ),
+                allow_promotion_codes=True,
             )
         )
-        acc.stripe_customer_id = customer.id
-        await db.commit()
-
-    price_id = await run_in_threadpool(_resolve_price_sync, body.plan)
-
-    front = (settings.FRONTEND_URL or "").rstrip("/")
-    session = await run_in_threadpool(
-        lambda: stripe.checkout.Session.create(
-            customer=acc.stripe_customer_id,
-            mode=spec["mode"],
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{front}/meus-acervos?assinatura=ok",
-            cancel_url=f"{front}/lp",
-            metadata={"account_id": acc.id, "plan": body.plan},
-            subscription_data=(
-                {"metadata": {"account_id": acc.id}}
-                if spec["mode"] == "subscription" else None
-            ),
-            allow_promotion_codes=True,
-        )
-    )
+    except stripe.StripeError as e:
+        # HTTPException passa pelo CORSMiddleware; um erro não tratado vira 500
+        # sem Access-Control-Allow-Origin e o navegador só mostra "Failed to fetch".
+        logger.exception("checkout stripe falhou (conta=%s plano=%s)", acc.id, body.plan)
+        _price_cache.pop(body.plan, None)
+        raise HTTPException(
+            502, "Não foi possível iniciar o pagamento agora. Tente de novo em instantes."
+        ) from e
     return {"url": session.url}
 
 
