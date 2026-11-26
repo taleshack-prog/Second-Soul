@@ -19,7 +19,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - run: pip install fastapi pydantic-settings httpx
+      # Mesmas dependências do Dockerfile.api. sentence-transformers fica de fora:
+      # puxa o torch (pesado) e a API só o importa sob demanda, nunca no boot.
+      - name: instalar dependências da API
+        run: |
+          grep -v '^sentence-transformers' apps/api/requirements.txt > /tmp/req-ci.txt
+          pip install -r /tmp/req-ci.txt -e packages/importer -e packages/voices -e packages/twin-engine
       - name: smoke test (app importa e /health responde)
         run: |
           cd apps/api
